@@ -402,7 +402,8 @@ function publishSync() {
     });
 }
 function sendChat(t) { if (!t) return; if (chan) chan.publish('chat', { t }); else { p.chatMsg = t; p.chatTimer = 160; } }
-setInterval(() => { publishSync(); let now = Date.now(); for (let id in peers) if (now - peers[id].lastSeen > 4000) delete peers[id]; }, 85);
+// Interval sync dipercepat jadi 70ms agar lerp 60fps lebih mulus merespons
+setInterval(() => { publishSync(); let now = Date.now(); for (let id in peers) if (now - peers[id].lastSeen > 4000) delete peers[id]; }, 70); 
 
 // ── MANUAL BOOST (STAR JUMP) ──
 function updateBoostBtn() {
@@ -887,9 +888,19 @@ function loop() {
         ctx.fill(); ctx.globalAlpha=1;
     }
 
+    // ── LERPING POSISI PEERS BIKIN GERAKAN 60 FPS SUPER HALUS ──
     for (let id in peers) {
-        let op=peers[id]; if (op.tx!==undefined) { op.x+=(op.tx-op.x)*.28; op.y+=(op.ty-op.y)*.28; }
-        if (op.n) drawCharacter(op.x, op.y, op.c||'#e2e8f0', op.sx||1, op.sy||1, op.n, op.f||'right', op.fly?30:0, op.rocket?30:0, op.ss?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, op.stun?1:0, op.fl, op.sh);
+        let op=peers[id]; 
+        if (op.tx!==undefined) { 
+            // Mengurangi koefisien dari 0.28 ke 0.15 biar lebih mulus dari framerate network 
+            op.x += (op.tx - op.x) * 0.15; 
+            op.y += (op.ty - op.y) * 0.15; 
+            // Lerp Skala (Squash & Stretch)
+            if (op.rsx === undefined) { op.rsx = op.sx || 1; op.rsy = op.sy || 1; }
+            op.rsx += ((op.sx || 1) - op.rsx) * 0.2;
+            op.rsy += ((op.sy || 1) - op.rsy) * 0.2;
+        }
+        if (op.n) drawCharacter(op.x, op.y, op.c||'#e2e8f0', op.rsx||1, op.rsy||1, op.n, op.f||'right', op.fly?30:0, op.rocket?30:0, op.ss?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, op.stun?1:0, op.fl, op.sh);
     }
     
     let isFallingLocal = p.isFreeFalling || p.vy > 10;
@@ -938,6 +949,16 @@ document.getElementById('tzL').addEventListener('mouseup',()=>{keys.left=false;}
 document.getElementById('tzR').addEventListener('mousedown',()=>{keys.right=true;p.facing='right';}); 
 document.getElementById('tzR').addEventListener('mouseup',()=>{keys.right=false;});
 
+window.addEventListener('keydown', e => { 
+    let ci = document.getElementById('chatTxt'); if (document.activeElement === ci) return; 
+    if (e.key==='ArrowLeft'||e.key==='a') { keys.left=true; p.facing='left'; }
+    if (e.key==='ArrowRight'||e.key==='d') { keys.right=true; p.facing='right'; }
+});
+window.addEventListener('keyup', e => { 
+    if (e.key==='ArrowLeft'||e.key==='a') keys.left=false; 
+    if (e.key==='ArrowRight'||e.key==='d') keys.right=false; 
+});
+
 const chatFabBtn = document.getElementById('chatFabBtn'), chatPopup  = document.getElementById('chatPopup');
 chatFabBtn.onclick = () => chatPopup.classList.toggle('open');
 document.querySelectorAll('.qc-btn').forEach(btn => { btn.onclick = () => { sendChat(btn.textContent); chatPopup.classList.remove('open'); }; });
@@ -949,4 +970,6 @@ lbFetch(); loop();
 </script>
 </body>
 </html>
+
+
 
