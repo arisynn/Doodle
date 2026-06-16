@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -103,6 +104,15 @@
         #chatTxt{flex:1;padding:6px 10px;border:2px solid #cbd5e1;border-radius:999px;font-family:'Patrick Hand',cursive;font-size:.85rem;outline:none;}
         #chatSend{width:32px;height:32px;border-radius:50%;background:#3b82f6;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;}
 
+        /* ── ACTION BUTTONS ── */
+        #boostBtn {
+            display:none; position:absolute; bottom:120px; left:50%; transform:translateX(-50%); z-index:35; pointer-events:auto;
+            background:linear-gradient(135deg, #fde047, #f59e0b); border:3px solid #b45309; border-radius:999px; 
+            padding:12px 24px; font-family:'Nunito',sans-serif; font-size:1.1rem; font-weight:900; color:#fff; 
+            box-shadow:0 6px 0 #b45309; cursor:pointer; transition:transform 0.1s, box-shadow 0.1s; text-shadow:1px 1px 0 #b45309;
+        }
+        #boostBtn:active { transform:translate(-50%, 4px); box-shadow:0 2px 0 #b45309; }
+
         /* ── TOUCH ZONES ── */
         #touchZone{position:absolute;bottom:0;left:0;width:100%;height:65%;z-index:5;display:none;}
         .tz{position:absolute;top:0;height:100%;}
@@ -129,7 +139,6 @@
                 <div id="scoreHud" class="hud-card" style="display:none; flex-direction:column; gap:6px;">
                     <div class="flex-center" style="justify-content:space-between;">
                         <div class="flex-center">
-                            <!-- SVG Berubah jadi Icon Gunung/Ketinggian -->
                             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5"><path d="M21 18l-7-10-3 5-4-6-5 11h19z" fill="#fef3c7"/><path d="M21 18l-7-10-3 5-4-6-5 11h19z"/></svg>
                             <span id="scoreVal" style="font-size:1.4rem; color:#3b82f6; font-weight:900; line-height:1;">0m</span>
                         </div>
@@ -180,7 +189,9 @@
         </div>
     </div>
 
-    <!-- Start Screen Modal -->
+    <!-- Modals & Overlays -->
+    <button id="boostBtn">⭐ SUPER JUMP! (<span id="boostCount">0</span>)</button>
+
     <div id="overlay">
         <div class="modal">
             <h1>DOODLE <span>MMO</span></h1>
@@ -214,7 +225,7 @@
                 <button class="qc-btn">Ayo naik!</button>
                 <button class="qc-btn">Hahaha!</button>
                 <button class="qc-btn">AAAAAA!</button>
-                <button class="qc-btn">GG bro!</button>
+                <button class="qc-btn">Tolong!</button>
                 <button class="qc-btn">Pusing x_x</button>
             </div>
             <div id="chatInputRow">
@@ -272,16 +283,16 @@ let playerName  = 'Doodler';
 
 let p = {
     x: 0, y: 0, vx: 0, vy: 0, oldY: 0, scaleX: 1, scaleY: 1, facing: 'right',
-    flyTimer: 0, rocketTimer: 0, springShoesTimer: 0,
+    flyTimer: 0, rocketTimer: 0, springShoesTimer: 0, starCharges: 0, hasShield: false, isFreeFalling: false,
     chatMsg: '', chatTimer: 0, idleBreath: 0, isIdle: false,
     currentPlatform: null, platOffsetX: 0, stunTimer: 0, expressionTimer: 0,
     collectedLoot: new Set()
 };
 
 let peers = {}, platforms = new Map(), stars = new Map(), items = new Map(), particles = [];
-let camY = 0, score = 0, highScore = parseInt(localStorage.getItem('doodle_hs_meters') || '0');
+let camY = 0, currentMeters = 0, displayScore = 0, highScore = parseInt(localStorage.getItem('doodle_hs_meters') || '0');
 
-const GRAVITY = 0.55, JUMP_FORCE = -14, SPRING_FORCE = -20, TRAMPOLINE_FORCE = -25, FLY_FORCE = -20, ROCKET_FORCE = -30, BUMPER_FORCE = -17;
+const GRAVITY = 0.55, JUMP_FORCE = -14, SPRING_FORCE = -20, TRAMPOLINE_FORCE = -25, FLY_FORCE = -20, ROCKET_FORCE = -30, BUMPER_FORCE = -17, BOOST_FORCE = -30;
 const TERMINAL_V = 18, FALL_V = 35, MOVE_SPEED = 9, PLAT_GAP = 115;
 let keys = { left: false, right: false };
 
@@ -349,7 +360,10 @@ function escHtml(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;'
 // ── SAVE & RESTORE STATE (AFK BYPASS) ──
 function saveState() {
     if (gameState === 'PLAY' && p.y < GROUND_Y - 100) {
-        localStorage.setItem(SAVE_KEY, JSON.stringify({ x: p.x, y: p.y, camY: camY, score: score }));
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ 
+            x: p.x, y: p.y, camY: camY, score: currentMeters, 
+            stars: p.starCharges, shield: p.hasShield 
+        }));
     }
 }
 function clearState() { localStorage.removeItem(SAVE_KEY); }
@@ -363,7 +377,7 @@ function connectAbly(name) {
     if (ably) { try { ably.close(); } catch(e){} }
     try {
         ably = new Ably.Realtime({ key: ABLY_KEY, clientId: myId }); 
-        chan = ably.channels.get('doodle-mmo-ultimate-v8');
+        chan = ably.channels.get('doodle-mmo-ultimate-v9');
         chan.presence.subscribe(() => { chan.presence.get((err, m) => { if(m) document.getElementById('onlineCnt').textContent = m.length; }); });
         chan.subscribe('sync', msg => {
             if (msg.clientId === myId) return; let d = msg.data, id = msg.clientId;
@@ -380,15 +394,35 @@ function connectAbly(name) {
 
 function publishSync() {
     if (!chan || gameState === 'MENU') return;
-    let isFallingLocal = p.vy > 10 || gameState === 'DEAD'; // Hitung ekspresi jatuh buat dikirim
+    let isFallingLocal = p.isFreeFalling || p.vy > 10; 
     chan.publish('sync', {
         x: p.x, y: p.y, c: playerColor, n: playerName, sx: p.scaleX, sy: p.scaleY, f: p.facing,
-        fly: p.flyTimer>0, rocket: p.rocketTimer>0, ss: p.springShoesTimer>0,
-        s: gameState==='DEAD' ? 0 : score, stun: (p.stunTimer>0 || gameState==='DEAD'), fl: isFallingLocal
+        fly: p.flyTimer>0, rocket: p.rocketTimer>0, ss: p.springShoesTimer>0, sh: p.hasShield,
+        s: currentMeters, stun: p.stunTimer>0, fl: isFallingLocal
     });
 }
 function sendChat(t) { if (!t) return; if (chan) chan.publish('chat', { t }); else { p.chatMsg = t; p.chatTimer = 160; } }
 setInterval(() => { publishSync(); let now = Date.now(); for (let id in peers) if (now - peers[id].lastSeen > 4000) delete peers[id]; }, 85);
+
+// ── MANUAL BOOST (STAR JUMP) ──
+function updateBoostBtn() {
+    const btn = document.getElementById('boostBtn');
+    if (p.starCharges > 0 && !p.isFreeFalling && p.stunTimer <= 0) {
+        btn.style.display = 'block'; document.getElementById('boostCount').textContent = p.starCharges;
+    } else {
+        btn.style.display = 'none';
+    }
+}
+function doBoost() {
+    if (p.starCharges > 0 && gameState === 'PLAY' && !p.isFreeFalling && p.stunTimer <= 0) {
+        p.starCharges--;
+        p.vy = BOOST_FORCE;
+        spawnParticles(p.x, p.y, '#fbbf24', 25);
+        floatText(p.x, p.y, 'SUPER JUMP!', '#f59e0b');
+        updateBoostBtn();
+    }
+}
+document.getElementById('boostBtn').onclick = (e) => { e.preventDefault(); doBoost(); };
 
 // ── MAP GEN (ZIG-ZAG ANTI STUCK) ──
 function mulberry32(seed) { return function() { let t = seed += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -406,21 +440,22 @@ function generateLevel(lvl) {
 
     let type = 'normal';
     if (lvl > 3) {
-        if      (r3 > .93) type = 'portal';
-        else if (r3 > .88) type = 'spike';
-        else if (r3 > .82) type = 'trampoline';
-        else if (r3 > .72) type = 'spring';
-        else if (r3 > .60) type = 'fragile';
-        else if (r3 > .48) type = 'blinking';
-        else if (r3 > .30) type = 'moving';
+        if      (r3 > .96) type = 'portal';
+        else if (r3 > .91) type = 'spike';
+        else if (r3 > .86) type = 'cloud'; // Cloud Ghost Platform
+        else if (r3 > .80) type = 'trampoline';
+        else if (r3 > .68) type = 'spring';
+        else if (r3 > .56) type = 'fragile';
+        else if (r3 > .44) type = 'blinking';
+        else if (r3 > .28) type = 'moving';
     }
-    if (lvl > 8 && r3 > .97) type = 'bumper';
+    if (lvl > 8 && r3 > .98) type = 'bumper';
 
     let item = null, hasStar = false;
-    if (!['spike','portal','bumper'].includes(type)) {
-        if (lvl > 5 && lvl % 18 === 0) {
-            if (r4 > .66) item = 'rocket'; else if (r4 > .33) item = 'hat'; else item = 'shoes';
-        } else if (r4 > .80) hasStar = true;
+    if (!['spike','portal','bumper','cloud'].includes(type)) {
+        if (lvl > 5 && lvl % 15 === 0) {
+            if (r4 > .75) item = 'rocket'; else if (r4 > .50) item = 'hat'; else if (r4 > .25) item = 'shoes'; else item = 'shield';
+        } else if (r4 > .92) hasStar = true; // Drop rate bintang diperkecil
     }
     return { type, x: px, y: py, w: pw, item, hasStar, baseX: px };
 }
@@ -447,12 +482,19 @@ class Platform {
     draw() {
         if (this.type === 'bumper') { this.drawBumper(); return; }
         if (this.type === 'portal') { this.drawPortal(); return; }
+        if (this.type === 'cloud') {
+            if (this.broken) return; // Hilang selamanya
+            ctx.save(); let cx = this.x, cy = this.y;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'; ctx.strokeStyle = 'rgba(203, 213, 225, 0.9)'; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.arc(cx+12, cy, 14, 0, Math.PI*2); ctx.arc(cx+this.w/2, cy-6, 18, 0, Math.PI*2); ctx.arc(cx+this.w-12, cy, 14, 0, Math.PI*2);
+            ctx.fill(); ctx.stroke(); ctx.restore(); return;
+        }
         
         // ── TEXTURE GROUND TERKUNCI (ABSOLUT) ──
         if (this.type === 'ground') {
             ctx.save();
             ctx.fillStyle = '#4ade80';
-            ctx.fillRect(this.x, this.y, this.w, H + 1000); // Ekstra panjang ke bawah biar ga bolong saat viewport naik turun
+            ctx.fillRect(this.x, this.y, this.w, H + 2000); 
             ctx.strokeStyle = '#15803d'; ctx.lineWidth = 4;
             ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.w, this.y); ctx.stroke();
             ctx.strokeStyle = '#bbf7d0'; ctx.lineWidth = 2;
@@ -528,6 +570,10 @@ class ItemObj {
         } else if (this.type === 'shoes') {
             ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.roundRect(-12,-6,24,14,4); ctx.fill(); ctx.stroke();
             ctx.strokeStyle='#15803d'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-6,8); ctx.lineTo(-9,14); ctx.lineTo(0,18); ctx.stroke(); ctx.beginPath(); ctx.moveTo(6,8); ctx.lineTo(3,14); ctx.lineTo(12,18); ctx.stroke();
+        } else if (this.type === 'shield') {
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.4)'; ctx.strokeStyle = '#06b6d4';
+            ctx.beginPath(); ctx.arc(0,0,16,0,Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-5,-6,4,0,Math.PI*2); ctx.fill();
         }
         ctx.restore();
     }
@@ -541,7 +587,6 @@ function floatText(x, y, text, color='#fbbf24') {
     el.style.top  = (y - camY - 20) + 'px'; document.getElementById('gameContainer').appendChild(el); setTimeout(() => el.remove(), 1200);
 }
 
-// Map Build sekarang bergantung pada posisi Kamera saat Resume
 function buildMap() { 
     platforms.clear(); stars.clear(); items.clear(); 
     let topLvl = Math.floor((GROUND_Y - camY + H) / PLAT_GAP) + 20;
@@ -559,27 +604,28 @@ function resetGame(keepPosition = false, resume = false) {
     p.vy = JUMP_FORCE; p.vx = 0;
     p.flyTimer=0; p.rocketTimer=0; p.springShoesTimer=0;
     p.scaleX=1; p.scaleY=1; p.isIdle=false; p.currentPlatform=null; p.facing='right'; 
-    p.stunTimer = 0; p.platOffsetX = 0;
+    p.stunTimer = 0; p.platOffsetX = 0; p.isFreeFalling = false;
     p.collectedLoot.clear(); p.expressionTimer=0;
     particles=[];
 
     if (!keepPosition) {
         let saved = resume ? JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') : null;
         if (saved && saved.y < GROUND_Y - 100) {
-            p.x = saved.x; p.y = saved.y; camY = saved.camY; score = saved.score;
+            p.x = saved.x; p.y = saved.y; camY = saved.camY; currentMeters = saved.score; displayScore = currentMeters;
+            p.starCharges = saved.stars || 0; p.hasShield = saved.shield || false;
         } else {
-            p.x = MAP_W/2; p.y = GROUND_Y - 80; camY = GROUND_Y - H + 20; score = 0;
+            p.x = MAP_W/2; p.y = GROUND_Y - 80; camY = GROUND_Y - H + 20; currentMeters = 0; displayScore = 0;
+            p.starCharges = 0; p.hasShield = false;
         }
     }
     
-    buildMap();
-
-    document.getElementById('scoreVal').textContent = score + 'm';
+    buildMap(); updateBoostBtn();
+    document.getElementById('scoreVal').textContent = Math.floor(displayScore) + 'm';
     document.getElementById('powerBar').style.display = 'none';
     gameState = 'PLAY';
 }
 
-function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, ssT, isLocal, chatMsg, chatTimer, expresT, stunT, isFalling) {
+function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, ssT, isLocal, chatMsg, chatTimer, expresT, stunT, isFalling, hasShield) {
     let w=44, h=54; ctx.save();
     
     let eox = 0;
@@ -587,18 +633,23 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, ssT
     else if (facing === 'left') eox = -5;
     
     ctx.font = `900 15px 'Nunito',sans-serif`; ctx.textAlign='center';
-    ctx.strokeStyle='white'; ctx.lineWidth=4; ctx.strokeText(name, cx, cy-h-18);
-    ctx.fillStyle='#334155'; ctx.fillText(name, cx, cy-h-18);
+    ctx.strokeStyle='white'; ctx.lineWidth=4; ctx.strokeText(name, cx, cy-h-25);
+    ctx.fillStyle='#334155'; ctx.fillText(name, cx, cy-h-25);
     
     if (chatTimer > 0 && chatMsg) {
         ctx.save(); ctx.font = "700 13px 'Patrick Hand',cursive"; let tw = Math.max(50, ctx.measureText(chatMsg).width + 20), th=28;
-        ctx.translate(cx, cy-h-40); ctx.fillStyle='rgba(255,255,255,.96)'; ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=2;
+        ctx.translate(cx, cy-h-50); ctx.fillStyle='rgba(255,255,255,.96)'; ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=2;
         ctx.beginPath(); ctx.roundRect(-tw/2,-th,tw,th,12); ctx.fill(); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(-6,0); ctx.lineTo(6,0); ctx.lineTo(0,7); ctx.fill();
         ctx.fillStyle='#334155'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(chatMsg, 0, -th/2); ctx.restore();
     }
 
     ctx.translate(cx, cy); ctx.scale(scX, scY);
+
+    if (hasShield) {
+        ctx.fillStyle = 'rgba(6, 182, 212, 0.25)'; ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0, -h/2, 36, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    }
 
     if (rocketT > 0 && stunT <= 0) {
         ctx.fillStyle='#ef4444'; ctx.strokeStyle=INK; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,-h-15); ctx.lineTo(-10,-h+5); ctx.lineTo(10,-h+5); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -624,7 +675,6 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, ssT
 
     ctx.fillStyle=INK; ctx.strokeStyle=INK;
     let isBlinking = (expresT % 180 < 8), isExcited = (rocketT > 0 || flyT > 0), isStunned = (stunT > 0);
-    // isFalling didapat dari Parameter sekarang, bukan global p.vy!
 
     if (isStunned) {
         ctx.lineWidth = 2.5; let eyeSize = 4;
@@ -653,7 +703,7 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, ssT
 }
 
 function updateLiveTopUI() {
-    let allPlayers = [{ n: playerName, s: gameState === 'DEAD' ? 0 : score }];
+    let allPlayers = [{ n: playerName, s: currentMeters }];
     for (let id in peers) allPlayers.push({ n: peers[id].n, s: peers[id].s || 0 });
     allPlayers.sort((a,b) => b.s - a.s); let top5 = allPlayers.slice(0, 5);
     document.getElementById('liveTopName').textContent = top5[0].s === 0 ? "-" : top5[0].n;
@@ -667,6 +717,8 @@ function updateLiveTopUI() {
     `).join('');
 }
 
+window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); doBoost(); } });
+
 function loop() {
     requestAnimationFrame(loop); ctx.clearRect(0,0,W,H);
     if (gameState === 'MENU') return;
@@ -675,30 +727,29 @@ function loop() {
     const pwrCon = document.getElementById('powerBar'), pwrFill = document.getElementById('powerFill');
     pwrCon.style.display = 'none';
 
-    // ── LOGIKA JATUH, PUSING, & SADAR OTOMATIS ──
-    if (gameState === 'DEAD') {
-        if (p.stunTimer > 0) {
-            p.stunTimer--; p.vx = 0; p.vy = 0; p.y = GROUND_Y;
-            p.scaleX += (1 - p.scaleX) * 0.1; p.scaleY += (1 - p.scaleY) * 0.1;
-            
-            if (p.stunTimer <= 0) {
-                floatText(p.x, p.y, "Ayo naik!", "#22c55e");
-                resetGame(true); // reset pertahankan X Y
-            }
-        } else {
-            p.vy += GRAVITY; if (p.vy > FALL_V) p.vy = FALL_V; 
-            p.y += p.vy; p.x += p.vx; 
-            if (p.x < 10) { p.x=10; p.vx *= -1; } if (p.x > MAP_W-10) { p.x=MAP_W-10; p.vx *= -1; }
+    // ── METER COUNTDOWN (KETINGGIAN) ──
+    currentMeters = Math.max(0, Math.floor((GROUND_Y - p.y) / 50));
+    if (gameState === 'PLAY' && currentMeters > highScore) { 
+        highScore = currentMeters; document.getElementById('highScoreVal').textContent = highScore + 'm'; localStorage.setItem('doodle_hs_meters', highScore); 
+    }
+    
+    // Muluskan visual hitungan mundur atau naik
+    if (displayScore < currentMeters) displayScore = currentMeters; 
+    else if (displayScore > currentMeters) {
+        displayScore -= Math.max(1, (displayScore - currentMeters) * 0.08);
+        if (displayScore < currentMeters) displayScore = currentMeters;
+    }
+    document.getElementById('scoreVal').textContent = Math.floor(displayScore) + 'm';
 
-            if (p.y >= GROUND_Y) {
-                p.y = GROUND_Y; p.vy = 0; p.vx = 0;
-                p.scaleX = 1.6; p.scaleY = 0.4; p.stunTimer = 80; 
-                spawnParticles(p.x, GROUND_Y, '#ef4444', 40);
-                p.chatMsg = 'Aduh... x_x'; p.chatTimer = 100;
-                if (chan) chan.publish('chat', {t: 'Aduh... x_x'});
-            }
+    // ── LOGIKA JATUH BEBAS (FREE FALL) & SADAR OTOMATIS ──
+    if (p.stunTimer > 0) {
+        p.stunTimer--; p.vx = 0; p.vy = 0; p.y = GROUND_Y;
+        p.scaleX += (1 - p.scaleX) * 0.1; p.scaleY += (1 - p.scaleY) * 0.1;
+        if (p.stunTimer <= 0) {
+            floatText(p.x, p.y, "Ayo naik!", "#22c55e");
+            updateBoostBtn();
         }
-    } else if (gameState === 'PLAY') {
+    } else {
         if (p.rocketTimer > 0) { p.rocketTimer--; p.vy = ROCKET_FORCE; pwrCon.style.display='block'; pwrFill.style.width=(p.rocketTimer/80*100)+'%'; pwrFill.style.background='#ef4444'; }
         else if (p.flyTimer > 0) { p.flyTimer--; p.vy = FLY_FORCE; pwrCon.style.display='block'; pwrFill.style.width=(p.flyTimer/150*100)+'%'; pwrFill.style.background='#60a5fa'; }
         else { p.vy += GRAVITY; if (p.vy > TERMINAL_V) p.vy = TERMINAL_V; }
@@ -721,31 +772,39 @@ function loop() {
         if (p.x < -22) p.x = MAP_W+22; else if (p.x > MAP_W+22) p.x = -22;
 
         if (!p.isIdle) { let tSy = 1, tSx = 1; if (p.vy < -5) { tSy=1.18; tSx=.88; } else if (p.vy > 5) { tSy=1.06; tSx=.96; } p.scaleX += (tSx-p.scaleX)*.2; p.scaleY += (tSy-p.scaleY)*.2; }
+
+        // Memicu jatuh bebas jika keluar layar bawah
+        if (gameState === 'PLAY' && p.y > camY + H + 50 && !p.isFreeFalling) {
+            p.isFreeFalling = true; updateBoostBtn();
+            p.chatMsg = 'AAAAAA!!!'; p.chatTimer = 100; if (chan) chan.publish('chat',{t:'AAAAAA!!!'});
+        }
+
+        // Hantam Tanah (Ground)
+        if (p.y >= GROUND_Y) {
+            p.y = GROUND_Y; p.vy = 0; p.vx = 0; p.isFreeFalling = false;
+            p.scaleX = 1.6; p.scaleY = 0.4; p.stunTimer = 80; 
+            spawnParticles(p.x, GROUND_Y, '#ef4444', 40);
+            p.chatMsg = 'Aduh... x_x'; p.chatTimer = 100;
+            if (chan) chan.publish('chat', {t: 'Aduh... x_x'});
+            lbSubmit(playerName, Math.max(0, currentMeters)); clearState(); // Menyentuh tanah berarti reset progress state
+        }
     }
 
-    if (gameState === 'PLAY') {
+    // ── KAMERA ──
+    if (p.isFreeFalling) {
+        camY += ((p.y - H/2) - camY) * 0.15; // Kamera meluncur ke bawah ngikutin pemain jatuh
+    } else if (gameState === 'PLAY') {
         let tCam = p.y - H*.52; if (tCam < camY) camY += (tCam-camY)*.22;
-    } else {
-        let targetCamY = GROUND_Y - H + 20; 
-        camY += (targetCamY - camY) * 0.18; 
     }
 
     let maxCamY = GROUND_Y - H + 20;
     if (camY > maxCamY) camY = maxCamY;
 
+    // Render culling
     let topLvl = Math.floor((GROUND_Y - camY + H) / PLAT_GAP) + 5; 
     let botLvl = Math.max(0, Math.floor((GROUND_Y - (camY+H)) / PLAT_GAP) - 3);
     for (let l=botLvl; l<=topLvl; l++) initLevel(l);
     for (let [k,v] of platforms) if (k>0 && (k<botLvl-8||k>topLvl+8)) { platforms.delete(k); stars.delete(k); items.delete(k); }
-
-    // ── SCORE MENJADI METER (KETINGGIAN) ──
-    if (gameState === 'PLAY') {
-        let curMeters = Math.max(0, Math.floor((GROUND_Y - p.y) / 50));
-        if (curMeters > score) {
-            score = curMeters; document.getElementById('scoreVal').textContent = score + 'm';
-            if (score > highScore) { highScore = score; document.getElementById('highScoreVal').textContent = highScore + 'm'; localStorage.setItem('doodle_hs_meters', highScore); }
-        }
-    }
 
     updateLiveTopUI(); 
     ctx.save(); ctx.translate(mapOffsetX, -camY);
@@ -755,11 +814,10 @@ function loop() {
     if (gameState === 'PLAY') {
         for (let [k,s] of stars) {
             if (p.collectedLoot.has(s.id)) continue; s.update(); s.draw();
-            // ── BINTANG KINI MENJADI BOOST MINI (BUKAN SKOR) ──
+            // ── DAPAT BINTANG (TAMBAH CHARGE LOMPAT MANUAL) ──
             if (p.flyTimer<=0 && p.rocketTimer<=0 && Math.abs(p.x-s.x)<34 && p.y>s.y-34 && p.y<s.y+20) { 
-                p.collectedLoot.add(s.id); 
-                p.vy = -22; // Boost Lompat!
-                spawnParticles(s.x, s.y, '#fbbf24', 12); floatText(s.x, s.y, 'LOMPAT!', '#f59e0b'); 
+                p.collectedLoot.add(s.id); p.starCharges++; updateBoostBtn();
+                spawnParticles(s.x, s.y, '#fbbf24', 12); floatText(s.x, s.y, '+1 BINTANG!', '#f59e0b'); 
             }
         }
         for (let [k,it] of items) {
@@ -767,7 +825,10 @@ function loop() {
             if (p.flyTimer <= 0 && p.rocketTimer <= 0) {
                 if (Math.abs(p.x-it.x)<36 && p.y>it.y-36 && p.y<it.y+22) {
                     p.collectedLoot.add(it.id); spawnParticles(it.x, it.y, '#fff', 16);
-                    if (it.type==='hat') { p.flyTimer=150; floatText(it.x,it.y,'TERBANG!','#60a5fa'); } if (it.type==='rocket') { p.rocketTimer=80; floatText(it.x,it.y,'ROKET!','#ef4444'); } if (it.type==='shoes') { p.springShoesTimer=600; floatText(it.x,it.y,'SEPATU PEGAS!','#22c55e'); }
+                    if (it.type==='hat') { p.flyTimer=150; floatText(it.x,it.y,'TERBANG!','#60a5fa'); } 
+                    if (it.type==='rocket') { p.rocketTimer=80; floatText(it.x,it.y,'ROKET!','#ef4444'); } 
+                    if (it.type==='shoes') { p.springShoesTimer=600; floatText(it.x,it.y,'SEPATU PEGAS!','#22c55e'); }
+                    if (it.type==='shield') { p.hasShield=true; floatText(it.x,it.y,'PERISAI!','#06b6d4'); }
                 }
             }
         }
@@ -776,14 +837,21 @@ function loop() {
         for (let [k,it] of items) if(!p.collectedLoot.has(it.id)) it.draw();
     }
 
-    if (gameState === 'PLAY' && p.vy > 0 && p.flyTimer<=0 && p.rocketTimer<=0 && !p.isIdle) {
+    // Hanya bisa menginjak platform jika sedang tidak Free Falling
+    if (gameState === 'PLAY' && p.vy > 0 && p.flyTimer<=0 && p.rocketTimer<=0 && !p.isIdle && !p.isFreeFalling) {
         for (let [k,pl] of platforms) {
-            if (pl.broken || !pl.isSolid) continue;
+            // Abaikan pijakan kalau platform sudah di luar batas bawah layar
+            if (pl.broken || !pl.isSolid || pl.y > camY + H + 10) continue; 
             let rx = pl.type==='moving' ? pl.x : pl.x;
             if (p.x+16 > rx && p.x-16 < rx+pl.w && p.oldY <= pl.y+8 && p.y >= pl.y-6) {
                 p.y = pl.y;
                 if (pl.type==='portal') { spawnParticles(p.x, p.y, '#a855f7', 18); p.y -= 900; camY -= 900; p.vy = JUMP_FORCE; break; }
-                if (pl.type==='spike') { spawnParticles(p.x, p.y, '#ef4444', 12); p.vy = BUMPER_FORCE; p.vx = (Math.random()>.5?8:-8); p.chatMsg='Aduh!!'; p.chatTimer=80; if(chan)chan.publish('chat',{t:'Aduh!!'}); break; }
+                if (pl.type==='cloud') { pl.broken=true; spawnParticles(rx+pl.w/2,pl.y,'#fff',15); let f=p.springShoesTimer>0?JUMP_FORCE*1.3:JUMP_FORCE; p.vy=f; p.scaleX=1.35; p.scaleY=.7; break; }
+                if (pl.type==='spike') { 
+                    if (p.hasShield) { p.hasShield = false; p.vy = BUMPER_FORCE; spawnParticles(p.x, p.y, '#06b6d4', 20); floatText(p.x, p.y, 'PERISAI PECAH!', '#06b6d4'); }
+                    else { spawnParticles(p.x, p.y, '#ef4444', 12); p.vy = BUMPER_FORCE; p.vx = (Math.random()>.5?8:-8); p.chatMsg='Aduh!!'; p.chatTimer=80; if(chan)chan.publish('chat',{t:'Aduh!!'}); }
+                    break; 
+                }
                 if (pl.type==='bumper') { p.vy = BUMPER_FORCE; p.vx = (p.x < rx+pl.w/2) ? -10 : 10; spawnParticles(p.x,p.y,'#f0abfc',10); pl.bounceAnim=15; break; }
                 if (pl.type==='fragile') { pl.broken=true; pl.restoreTimer=180; spawnParticles(rx+pl.w/2,pl.y,pl.color,12); let f=p.springShoesTimer>0?JUMP_FORCE*1.3:JUMP_FORCE; p.vy=f; p.scaleX=1.35; p.scaleY=.7; break; }
                 if (pl.type==='spring') { p.vy=SPRING_FORCE; p.scaleX=1.4; p.scaleY=.65; pl.bounceAnim=15; spawnParticles(p.x,p.y,'#fde047',6); break; }
@@ -805,23 +873,15 @@ function loop() {
         ctx.fill(); ctx.globalAlpha=1;
     }
 
-    // Menggambar Pemain Lain (Berdasarkan Status "Jatuh" Mereka Sendiri [op.fl])
     for (let id in peers) {
         let op=peers[id]; if (op.tx!==undefined) { op.x+=(op.tx-op.x)*.28; op.y+=(op.ty-op.y)*.28; }
-        if (op.n) drawCharacter(op.x, op.y, op.c||'#e2e8f0', op.sx||1, op.sy||1, op.n, op.f||'right', op.fly?30:0, op.rocket?30:0, op.ss?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, op.stun?1:0, op.fl);
+        if (op.n) drawCharacter(op.x, op.y, op.c||'#e2e8f0', op.sx||1, op.sy||1, op.n, op.f||'right', op.fly?30:0, op.rocket?30:0, op.ss?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, op.stun?1:0, op.fl, op.sh);
     }
     
-    // Menggambar Pemain Lokal (Berdasarkan Kecepatan Lokal)
-    let isFallingLocal = p.vy > 10 || gameState === 'DEAD';
-    drawCharacter(p.x, p.y, playerColor, p.scaleX, p.scaleY, playerName, p.facing, p.flyTimer, p.rocketTimer, p.springShoesTimer, true, p.chatMsg, p.chatTimer, p.expressionTimer, p.stunTimer, isFallingLocal);
+    let isFallingLocal = p.isFreeFalling || p.vy > 10;
+    drawCharacter(p.x, p.y, playerColor, p.scaleX, p.scaleY, playerName, p.facing, p.flyTimer, p.rocketTimer, p.springShoesTimer, true, p.chatMsg, p.chatTimer, p.expressionTimer, p.stunTimer, isFallingLocal, p.hasShield);
     
     ctx.restore(); 
-
-    // KALAU JATUH MATI (MULAI LAGI DARI BAWAH + HAPUS SAVE)
-    if (p.y > camY + H + 120 && gameState === 'PLAY') {
-        gameState = 'DEAD'; lbSubmit(playerName, score); clearState();
-        p.flyTimer = 0; p.rocketTimer = 0; p.chatMsg = 'AAAAAA!!!'; p.chatTimer = 200; if (chan) chan.publish('chat',{t:'AAAAAA!!!'});
-    }
 }
 
 // ── UI INTERACTIONS & INPUT ──
@@ -837,15 +897,13 @@ document.getElementById('startBtn').onclick = async () => {
     if (!check.ok) { err.textContent = check.msg; document.getElementById('startBtn').disabled = false; return; }
     claimName(name); playerName = name;
     
-    // SIMPAN NAMA & WARNA KE LOCALSTORAGE
     localStorage.setItem('doodle_name', playerName);
     localStorage.setItem('doodle_color', playerColor);
 
     document.getElementById('overlay').style.display = 'none'; document.getElementById('scoreHud').style.display = 'flex'; document.getElementById('onlinePill').style.display = 'flex'; document.getElementById('chatFab').style.display = 'block'; document.getElementById('touchZone').style.display = 'flex';
-    connectAbly(name); resetGame(false, true); lbFetch(); // isResume = true
+    connectAbly(name); resetGame(false, true); lbFetch();
 };
 
-// AUTO LOAD NAMA & WARNA SAAT WEB DIBUKA
 let savedName = localStorage.getItem('doodle_name');
 let savedColor = localStorage.getItem('doodle_color');
 if (savedName) document.getElementById('nameInput').value = savedName;
@@ -856,16 +914,6 @@ if (savedColor) {
         if (btn.dataset.c === savedColor) btn.classList.add('selected');
     });
 }
-
-window.addEventListener('keydown', e => { 
-    let ci = document.getElementById('chatTxt'); if (document.activeElement === ci) return; 
-    if (e.key==='ArrowLeft'||e.key==='a') { keys.left=true; p.facing='left'; }
-    if (e.key==='ArrowRight'||e.key==='d') { keys.right=true; p.facing='right'; }
-});
-window.addEventListener('keyup', e => { 
-    if (e.key==='ArrowLeft'||e.key==='a') keys.left=false; 
-    if (e.key==='ArrowRight'||e.key==='d') keys.right=false; 
-});
 
 document.getElementById('tzL').addEventListener('touchstart',e=>{if(gameState==='PLAY'){e.preventDefault();keys.left=true;p.facing='left';}},{passive:false});
 document.getElementById('tzL').addEventListener('touchend',  e=>{if(gameState==='PLAY'){e.preventDefault();keys.left=false;}},{passive:false});
@@ -887,3 +935,5 @@ lbFetch(); loop();
 </script>
 </body>
 </html>
+
+
