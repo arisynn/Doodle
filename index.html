@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -125,22 +124,23 @@
     <!-- HUD -->
     <div id="hudLayer">
         <div class="hud-header">
-            <!-- LEFT PANEL: SCORE & LIVE TOP -->
+            <!-- LEFT PANEL: SCORE (METER) & LIVE TOP -->
             <div class="hud-left">
                 <div id="scoreHud" class="hud-card" style="display:none; flex-direction:column; gap:6px;">
                     <div class="flex-center" style="justify-content:space-between;">
                         <div class="flex-center">
-                            <svg class="icon" viewBox="0 0 24 24" fill="#fbbf24" stroke="#d97706" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                            <span id="scoreVal" style="font-size:1.4rem; color:#3b82f6; font-weight:900; line-height:1;">0</span>
+                            <!-- SVG Berubah jadi Icon Gunung/Ketinggian -->
+                            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5"><path d="M21 18l-7-10-3 5-4-6-5 11h19z" fill="#fef3c7"/><path d="M21 18l-7-10-3 5-4-6-5 11h19z"/></svg>
+                            <span id="scoreVal" style="font-size:1.4rem; color:#3b82f6; font-weight:900; line-height:1;">0m</span>
                         </div>
-                        <span style="font-size:0.7rem; color:#64748b; font-weight:700;">High: <span id="highScoreVal">0</span></span>
+                        <span style="font-size:0.7rem; color:#64748b; font-weight:700;">High: <span id="highScoreVal">0m</span></span>
                     </div>
                     
                     <div id="liveTopBtn">
                         <div class="flex-center">
                             <svg class="icon-sm" viewBox="0 0 24 24" fill="#ef4444" stroke="#b91c1c" stroke-width="1.5"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
                             <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:60px;" id="liveTopName">-</span> 
-                            <span>(<span id="liveTopScore">0</span>)</span>
+                            <span>(<span id="liveTopScore">0m</span>)</span>
                         </div>
                         <svg id="liveTopArrow" class="icon-sm" style="stroke:#d97706;" viewBox="0 0 24 24" fill="none" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
                     </div>
@@ -241,11 +241,12 @@ const UPSTASH_TOKEN = "gQAAAAAAASFlAAIgcDJjODE2YjZiYjg3OWE0M2NiOTBlMTY5MzRkODBmN
 const ABLY_KEY      = '4opURQ.FVPiqg:z5W8zQxWoBNlXmlAXvOv4Bz1bmn_ISnFucJGpjFijS8';
 const LB_KEY        = 'doodle_mmo_lb_v4';
 const NAMES_KEY     = 'doodle_mmo_names_v4';
+const SAVE_KEY      = 'doodle_mmo_save_state';
 const EXPIRE_MS     = 7 * 24 * 60 * 60 * 1000;
 
 // ── SISTEM KOORDINAT UNIVERSAL (100% SYNC FIX) ──
-const MAP_W = 420;      // Lebar arena selalu tetap secara logika
-const GROUND_Y = 0;     // Tanah selalu di titik Y = 0 untuk semua pemain
+const MAP_W = 420;      
+const GROUND_Y = 0;     
 
 // ── CANVAS & RESIZE ──
 const container = document.getElementById('gameContainer');
@@ -258,7 +259,7 @@ function resize() {
     W = container.clientWidth; H = container.clientHeight;
     canvas.width  = W * dpr; canvas.height = H * dpr;
     ctx.scale(dpr, dpr);
-    mapOffsetX = (W - MAP_W) / 2; // Memusatkan arena permainan di tengah layar
+    mapOffsetX = (W - MAP_W) / 2;
 }
 window.addEventListener('resize', resize); resize();
 
@@ -268,10 +269,9 @@ let gameState = 'MENU';
 let myId = 'dm_' + Math.random().toString(36).substr(2,8);
 let playerColor = '#e2e8f0';
 let playerName  = 'Doodler';
-let lastInputTime = Date.now();
 
 let p = {
-    x: 0, y: 0, vx: 0, vy: 0, oldY: 0, scaleX: 1, scaleY: 1, facing: 'right', // Selalu menghadap salah satu sisi
+    x: 0, y: 0, vx: 0, vy: 0, oldY: 0, scaleX: 1, scaleY: 1, facing: 'right',
     flyTimer: 0, rocketTimer: 0, springShoesTimer: 0,
     chatMsg: '', chatTimer: 0, idleBreath: 0, isIdle: false,
     currentPlatform: null, platOffsetX: 0, stunTimer: 0, expressionTimer: 0,
@@ -279,15 +279,13 @@ let p = {
 };
 
 let peers = {}, platforms = new Map(), stars = new Map(), items = new Map(), particles = [];
-let camY = 0, score = 0, highScore = parseInt(localStorage.getItem('doodle_hs') || '0');
+let camY = 0, score = 0, highScore = parseInt(localStorage.getItem('doodle_hs_meters') || '0');
 
 const GRAVITY = 0.55, JUMP_FORCE = -14, SPRING_FORCE = -20, TRAMPOLINE_FORCE = -25, FLY_FORCE = -20, ROCKET_FORCE = -30, BUMPER_FORCE = -17;
 const TERMINAL_V = 18, FALL_V = 35, MOVE_SPEED = 9, PLAT_GAP = 115;
 let keys = { left: false, right: false };
 
-document.getElementById('highScoreVal').textContent = highScore;
-
-function updateInputTime() { lastInputTime = Date.now(); }
+document.getElementById('highScoreVal').textContent = highScore + 'm';
 
 // ── SVG HELPERS ──
 function getMedalSVG(rank) {
@@ -341,16 +339,26 @@ function renderLB() {
         <div class="lb-row">
             <span class="lb-rank">${i<3 ? getMedalSVG(i+1) : `<span style="font-size:0.8rem;color:#94a3b8;font-weight:800;">${i+1}</span>`}</span>
             <span class="lb-name">${escHtml(e.name)}</span>
-            <span class="lb-score">${e.score}</span>
+            <span class="lb-score">${e.score}m</span>
         </div>`).join('');
-    if (leaderboard.length > 0) { document.getElementById('lbTop1Name').textContent = leaderboard[0].name; document.getElementById('lbTop1Score').textContent = leaderboard[0].score; }
+    if (leaderboard.length > 0) { document.getElementById('lbTop1Name').textContent = leaderboard[0].name; document.getElementById('lbTop1Score').textContent = leaderboard[0].score + 'm'; }
     else { document.getElementById('lbTop1Name').textContent = 'Belum ada'; document.getElementById('lbTop1Score').textContent = '-'; }
 }
 function escHtml(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// ── SAVE & RESTORE STATE (AFK BYPASS) ──
+function saveState() {
+    if (gameState === 'PLAY' && p.y < GROUND_Y - 100) {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({ x: p.x, y: p.y, camY: camY, score: score }));
+    }
+}
+function clearState() { localStorage.removeItem(SAVE_KEY); }
+window.addEventListener('beforeunload', saveState);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveState(); });
+
+
 // ── ABLY MULTIPLAYER ──
 let ably, chan;
-
 function connectAbly(name) {
     if (ably) { try { ably.close(); } catch(e){} }
     try {
@@ -372,38 +380,26 @@ function connectAbly(name) {
 
 function publishSync() {
     if (!chan || gameState === 'MENU') return;
-    // Mengirim Universal Y coordinate
+    let isFallingLocal = p.vy > 10 || gameState === 'DEAD'; // Hitung ekspresi jatuh buat dikirim
     chan.publish('sync', {
         x: p.x, y: p.y, c: playerColor, n: playerName, sx: p.scaleX, sy: p.scaleY, f: p.facing,
         fly: p.flyTimer>0, rocket: p.rocketTimer>0, ss: p.springShoesTimer>0,
-        s: gameState==='DEAD' ? 0 : score, stun: (p.stunTimer>0 || gameState==='DEAD') 
+        s: gameState==='DEAD' ? 0 : score, stun: (p.stunTimer>0 || gameState==='DEAD'), fl: isFallingLocal
     });
 }
-function sendChat(t) { if (!t) return; updateInputTime(); if (chan) chan.publish('chat', { t }); else { p.chatMsg = t; p.chatTimer = 160; } }
+function sendChat(t) { if (!t) return; if (chan) chan.publish('chat', { t }); else { p.chatMsg = t; p.chatTimer = 160; } }
 setInterval(() => { publishSync(); let now = Date.now(); for (let id in peers) if (now - peers[id].lastSeen > 4000) delete peers[id]; }, 85);
-
-function triggerAFK() {
-    gameState = 'MENU';
-    if (chan) { try { chan.presence.leave(); ably.close(); } catch(e){} chan = null; ably = null; }
-    document.getElementById('errMsg').textContent = "Terputus karena AFK (30 Detik)";
-    document.getElementById('overlay').style.display = 'flex';
-    document.getElementById('scoreHud').style.display = 'none';
-    document.getElementById('onlinePill').style.display = 'none';
-    document.getElementById('chatFab').style.display = 'none';
-    document.getElementById('touchZone').style.display = 'none';
-    document.getElementById('startBtn').disabled = false;
-}
 
 // ── MAP GEN (ZIG-ZAG ANTI STUCK) ──
 function mulberry32(seed) { return function() { let t = seed += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 function generateLevel(lvl) {
-    if (lvl === 0) return { type:'ground', x: -1500, y: GROUND_Y, w: 4000 }; // Tanah dibuat sangat luas
+    if (lvl === 0) return { type:'ground', x: -1500, y: GROUND_Y, w: 4000 }; 
     let rng = mulberry32(lvl * 7919 + 13337);
     let r1 = rng(), r2 = rng(), r3 = rng(), r4 = rng();
     
     let pw = 60 + r1 * 40;
-    let wave = Math.sin(lvl * 0.7) * (MAP_W * 0.25); // Alur zigzag berdasarkan Virtual MAP_W
+    let wave = Math.sin(lvl * 0.7) * (MAP_W * 0.25); 
     let centerPath = MAP_W/2 + wave;
     let px = Math.max(10, Math.min(MAP_W - pw - 10, centerPath + (r2 - 0.5) * 80));
     let py = GROUND_Y - lvl * PLAT_GAP;
@@ -452,12 +448,11 @@ class Platform {
         if (this.type === 'bumper') { this.drawBumper(); return; }
         if (this.type === 'portal') { this.drawPortal(); return; }
         
-        // DRAWING ABSOLUTE LOCKED GROUND
+        // ── TEXTURE GROUND TERKUNCI (ABSOLUT) ──
         if (this.type === 'ground') {
             ctx.save();
             ctx.fillStyle = '#4ade80';
-            // Bikin tinggi ground sebesar tinggi layar ke bawah biar gak bolong/ngambang
-            ctx.fillRect(this.x, this.y, this.w, H); 
+            ctx.fillRect(this.x, this.y, this.w, H + 1000); // Ekstra panjang ke bawah biar ga bolong saat viewport naik turun
             ctx.strokeStyle = '#15803d'; ctx.lineWidth = 4;
             ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + this.w, this.y); ctx.stroke();
             ctx.strokeStyle = '#bbf7d0'; ctx.lineWidth = 2;
@@ -542,43 +537,51 @@ function spawnParticles(x, y, color, amt) { for(let i=0;i<amt;i++) particles.pus
 
 function floatText(x, y, text, color='#fbbf24') {
     const el = document.createElement('div'); el.className = 'float-txt'; el.textContent = text; el.style.color = color;
-    // Tambahkan mapOffsetX agar teks muncul tepat di atas koordinat virtual item
     el.style.left = (x + mapOffsetX) + 'px'; 
     el.style.top  = (y - camY - 20) + 'px'; document.getElementById('gameContainer').appendChild(el); setTimeout(() => el.remove(), 1200);
 }
 
-function buildMap() { platforms.clear(); stars.clear(); items.clear(); let topLevel = Math.floor(H / PLAT_GAP) + 20; for (let i=0; i <= topLevel; i++) initLevel(i); }
+// Map Build sekarang bergantung pada posisi Kamera saat Resume
+function buildMap() { 
+    platforms.clear(); stars.clear(); items.clear(); 
+    let topLvl = Math.floor((GROUND_Y - camY + H) / PLAT_GAP) + 20;
+    let botLvl = Math.max(0, Math.floor((GROUND_Y - (camY+H)) / PLAT_GAP) - 5);
+    for (let i=botLvl; i <= topLvl; i++) initLevel(i);
+}
+
 function initLevel(lvl) {
     if (platforms.has(lvl)) return; let d = generateLevel(lvl); let pl = new Platform(lvl, d); pl.w = d.w; pl.baseX = d.x; platforms.set(lvl, pl);
     if (d.hasStar) stars.set(lvl, new StarObj(lvl, d.x + d.w/2, d.y)); if (d.item) items.set(lvl, new ItemObj(lvl, d.x + d.w/2, d.y, d.item));
 }
 
-// ── RESET GAME ──
-function resetGame(keepPosition = false) {
-    if (!keepPosition) {
-        p.x = MAP_W/2; 
-        p.y = GROUND_Y - 80;
-    }
+// ── RESET GAME & RESUME STATE ──
+function resetGame(keepPosition = false, resume = false) {
     p.vy = JUMP_FORCE; p.vx = 0;
     p.flyTimer=0; p.rocketTimer=0; p.springShoesTimer=0;
     p.scaleX=1; p.scaleY=1; p.isIdle=false; p.currentPlatform=null; p.facing='right'; 
     p.stunTimer = 0; p.platOffsetX = 0;
     p.collectedLoot.clear(); p.expressionTimer=0;
-    score=0; particles=[];
-    buildMap();
-    
-    // Setting awal posisi kamera menatap lurus ke ground secara absolute
-    camY = GROUND_Y - H + 20;
+    particles=[];
 
-    document.getElementById('scoreVal').textContent = '0';
+    if (!keepPosition) {
+        let saved = resume ? JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') : null;
+        if (saved && saved.y < GROUND_Y - 100) {
+            p.x = saved.x; p.y = saved.y; camY = saved.camY; score = saved.score;
+        } else {
+            p.x = MAP_W/2; p.y = GROUND_Y - 80; camY = GROUND_Y - H + 20; score = 0;
+        }
+    }
+    
+    buildMap();
+
+    document.getElementById('scoreVal').textContent = score + 'm';
     document.getElementById('powerBar').style.display = 'none';
     gameState = 'PLAY';
 }
 
-function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, ssT, isLocal, chatMsg, chatTimer, expresT, stunT) {
+function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, ssT, isLocal, chatMsg, chatTimer, expresT, stunT, isFalling) {
     let w=44, h=54; ctx.save();
     
-    // Facing Offset
     let eox = 0;
     if (facing === 'right') eox = 5;
     else if (facing === 'left') eox = -5;
@@ -620,7 +623,8 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, ssT
     ctx.beginPath(); ctx.arc(-13+eox,-h*.45,5,0,Math.PI*2); ctx.arc(13+eox,-h*.45,5,0,Math.PI*2); ctx.fill();
 
     ctx.fillStyle=INK; ctx.strokeStyle=INK;
-    let isBlinking = (expresT % 180 < 8), isExcited = (rocketT > 0 || flyT > 0), isStunned = (stunT > 0), isFalling = (!isStunned && (p.vy > 10 || gameState === 'DEAD'));
+    let isBlinking = (expresT % 180 < 8), isExcited = (rocketT > 0 || flyT > 0), isStunned = (stunT > 0);
+    // isFalling didapat dari Parameter sekarang, bukan global p.vy!
 
     if (isStunned) {
         ctx.lineWidth = 2.5; let eyeSize = 4;
@@ -653,24 +657,18 @@ function updateLiveTopUI() {
     for (let id in peers) allPlayers.push({ n: peers[id].n, s: peers[id].s || 0 });
     allPlayers.sort((a,b) => b.s - a.s); let top5 = allPlayers.slice(0, 5);
     document.getElementById('liveTopName').textContent = top5[0].s === 0 ? "-" : top5[0].n;
-    document.getElementById('liveTopScore').textContent = top5[0].s;
+    document.getElementById('liveTopScore').textContent = top5[0].s + 'm';
     document.getElementById('liveTopListRows').innerHTML = top5.map((p, i) => `
         <div class="lb-row">
             <span class="lb-rank" style="font-size:0.8rem; font-weight:800; color:#d97706;">#${i+1}</span>
             <span class="lb-name" style="font-size:0.8rem; color:#334155;">${escHtml(p.n)}</span>
-            <span class="lb-score" style="font-size:0.85rem; color:#b45309;">${p.s}</span>
+            <span class="lb-score" style="font-size:0.85rem; color:#b45309;">${p.s}m</span>
         </div>
     `).join('');
 }
 
 function loop() {
     requestAnimationFrame(loop); ctx.clearRect(0,0,W,H);
-    
-    if (gameState === 'PLAY' && Date.now() - lastInputTime > 30000) {
-        triggerAFK();
-        return;
-    }
-
     if (gameState === 'MENU') return;
 
     p.oldY = p.y; p.expressionTimer++; if (p.chatTimer > 0) p.chatTimer--;
@@ -684,17 +682,14 @@ function loop() {
             p.scaleX += (1 - p.scaleX) * 0.1; p.scaleY += (1 - p.scaleY) * 0.1;
             
             if (p.stunTimer <= 0) {
-                // Sadar otomatis, kembali siap loncat di posisi yang sama!
                 floatText(p.x, p.y, "Ayo naik!", "#22c55e");
-                resetGame(true); // reset game tapi pertahankan posisi X dan Y
+                resetGame(true); // reset pertahankan X Y
             }
         } else {
             p.vy += GRAVITY; if (p.vy > FALL_V) p.vy = FALL_V; 
             p.y += p.vy; p.x += p.vx; 
-            // Bound kiri kanan layarnya
             if (p.x < 10) { p.x=10; p.vx *= -1; } if (p.x > MAP_W-10) { p.x=MAP_W-10; p.vx *= -1; }
 
-            // Menabrak tanah bawah (Mulai pusing)
             if (p.y >= GROUND_Y) {
                 p.y = GROUND_Y; p.vy = 0; p.vx = 0;
                 p.scaleX = 1.6; p.scaleY = 0.4; p.stunTimer = 80; 
@@ -723,7 +718,6 @@ function loop() {
 
         p.x += p.vx; p.y += p.vy;
         
-        // Warp kiri kanan menggunakan Virtual MAP_W
         if (p.x < -22) p.x = MAP_W+22; else if (p.x > MAP_W+22) p.x = -22;
 
         if (!p.isIdle) { let tSy = 1, tSx = 1; if (p.vy < -5) { tSy=1.18; tSx=.88; } else if (p.vy > 5) { tSy=1.06; tSx=.96; } p.scaleX += (tSx-p.scaleX)*.2; p.scaleY += (tSy-p.scaleY)*.2; }
@@ -736,37 +730,37 @@ function loop() {
         camY += (targetCamY - camY) * 0.18; 
     }
 
-    // CLAMP KAMERA: Jangan biarkan kamera memperlihatkan bagian bawah dari ground
     let maxCamY = GROUND_Y - H + 20;
     if (camY > maxCamY) camY = maxCamY;
 
-    // Render culling berdasarkan Virtual GROUND_Y
     let topLvl = Math.floor((GROUND_Y - camY + H) / PLAT_GAP) + 5; 
     let botLvl = Math.max(0, Math.floor((GROUND_Y - (camY+H)) / PLAT_GAP) - 3);
     for (let l=botLvl; l<=topLvl; l++) initLevel(l);
     for (let [k,v] of platforms) if (k>0 && (k<botLvl-8||k>topLvl+8)) { platforms.delete(k); stars.delete(k); items.delete(k); }
 
+    // ── SCORE MENJADI METER (KETINGGIAN) ──
     if (gameState === 'PLAY') {
-        let curLvl = Math.floor((GROUND_Y - p.y) / PLAT_GAP);
-        if (curLvl > score) {
-            score = curLvl; document.getElementById('scoreVal').textContent = score;
-            if (score > highScore) { highScore = score; document.getElementById('highScoreVal').textContent = highScore; localStorage.setItem('doodle_hs', highScore); }
+        let curMeters = Math.max(0, Math.floor((GROUND_Y - p.y) / 50));
+        if (curMeters > score) {
+            score = curMeters; document.getElementById('scoreVal').textContent = score + 'm';
+            if (score > highScore) { highScore = score; document.getElementById('highScoreVal').textContent = highScore + 'm'; localStorage.setItem('doodle_hs_meters', highScore); }
         }
     }
 
     updateLiveTopUI(); 
-    
-    ctx.save(); 
-    // Terapkan Offset X agar map yang lebarnya fix (MAP_W) tetap ditengah layar.
-    // Dan terapkan Offset Y untuk Kamera.
-    ctx.translate(mapOffsetX, -camY);
+    ctx.save(); ctx.translate(mapOffsetX, -camY);
 
     for (let [k,pl] of platforms) { pl.update(); pl.draw(); }
 
     if (gameState === 'PLAY') {
         for (let [k,s] of stars) {
             if (p.collectedLoot.has(s.id)) continue; s.update(); s.draw();
-            if (p.flyTimer<=0 && p.rocketTimer<=0 && Math.abs(p.x-s.x)<34 && p.y>s.y-34 && p.y<s.y+20) { p.collectedLoot.add(s.id); score += 50; document.getElementById('scoreVal').textContent = score; spawnParticles(s.x, s.y, '#fbbf24', 12); floatText(s.x, s.y, '+50', '#f59e0b'); }
+            // ── BINTANG KINI MENJADI BOOST MINI (BUKAN SKOR) ──
+            if (p.flyTimer<=0 && p.rocketTimer<=0 && Math.abs(p.x-s.x)<34 && p.y>s.y-34 && p.y<s.y+20) { 
+                p.collectedLoot.add(s.id); 
+                p.vy = -22; // Boost Lompat!
+                spawnParticles(s.x, s.y, '#fbbf24', 12); floatText(s.x, s.y, 'LOMPAT!', '#f59e0b'); 
+            }
         }
         for (let [k,it] of items) {
             if (p.collectedLoot.has(it.id)) continue; it.update(); it.draw();
@@ -811,17 +805,21 @@ function loop() {
         ctx.fill(); ctx.globalAlpha=1;
     }
 
-    // Render multiplayer characters
+    // Menggambar Pemain Lain (Berdasarkan Status "Jatuh" Mereka Sendiri [op.fl])
     for (let id in peers) {
         let op=peers[id]; if (op.tx!==undefined) { op.x+=(op.tx-op.x)*.28; op.y+=(op.ty-op.y)*.28; }
-        if (op.n) drawCharacter(op.x, op.y, op.c||'#e2e8f0', op.sx||1, op.sy||1, op.n, op.f||'right', op.fly?30:0, op.rocket?30:0, op.ss?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, op.stun?1:0);
+        if (op.n) drawCharacter(op.x, op.y, op.c||'#e2e8f0', op.sx||1, op.sy||1, op.n, op.f||'right', op.fly?30:0, op.rocket?30:0, op.ss?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, op.stun?1:0, op.fl);
     }
-    // Render local character
-    drawCharacter(p.x, p.y, playerColor, p.scaleX, p.scaleY, playerName, p.facing, p.flyTimer, p.rocketTimer, p.springShoesTimer, true, p.chatMsg, p.chatTimer, p.expressionTimer, p.stunTimer);
-    ctx.restore(); // Bersihkan offset translate sebelum loop selanjutnya
+    
+    // Menggambar Pemain Lokal (Berdasarkan Kecepatan Lokal)
+    let isFallingLocal = p.vy > 10 || gameState === 'DEAD';
+    drawCharacter(p.x, p.y, playerColor, p.scaleX, p.scaleY, playerName, p.facing, p.flyTimer, p.rocketTimer, p.springShoesTimer, true, p.chatMsg, p.chatTimer, p.expressionTimer, p.stunTimer, isFallingLocal);
+    
+    ctx.restore(); 
 
+    // KALAU JATUH MATI (MULAI LAGI DARI BAWAH + HAPUS SAVE)
     if (p.y > camY + H + 120 && gameState === 'PLAY') {
-        gameState = 'DEAD'; lbSubmit(playerName, score);
+        gameState = 'DEAD'; lbSubmit(playerName, score); clearState();
         p.flyTimer = 0; p.rocketTimer = 0; p.chatMsg = 'AAAAAA!!!'; p.chatTimer = 200; if (chan) chan.publish('chat',{t:'AAAAAA!!!'});
     }
 }
@@ -839,44 +837,15 @@ document.getElementById('startBtn').onclick = async () => {
     if (!check.ok) { err.textContent = check.msg; document.getElementById('startBtn').disabled = false; return; }
     claimName(name); playerName = name;
     
-    // SIMPAN KE LOCALSTORAGE
+    // SIMPAN NAMA & WARNA KE LOCALSTORAGE
     localStorage.setItem('doodle_name', playerName);
     localStorage.setItem('doodle_color', playerColor);
 
     document.getElementById('overlay').style.display = 'none'; document.getElementById('scoreHud').style.display = 'flex'; document.getElementById('onlinePill').style.display = 'flex'; document.getElementById('chatFab').style.display = 'block'; document.getElementById('touchZone').style.display = 'flex';
-    updateInputTime(); connectAbly(name); resetGame(); lbFetch();
+    connectAbly(name); resetGame(false, true); lbFetch(); // isResume = true
 };
 
-window.addEventListener('keydown', e => { 
-    let ci = document.getElementById('chatTxt'); if (document.activeElement === ci) return; 
-    if (e.key==='ArrowLeft'||e.key==='a') { keys.left=true; p.facing='left'; }
-    if (e.key==='ArrowRight'||e.key==='d') { keys.right=true; p.facing='right'; }
-    updateInputTime();
-});
-window.addEventListener('keyup', e => { 
-    if (e.key==='ArrowLeft'||e.key==='a') keys.left=false; 
-    if (e.key==='ArrowRight'||e.key==='d') keys.right=false; 
-    updateInputTime();
-});
-
-document.getElementById('tzL').addEventListener('touchstart',e=>{if(gameState==='PLAY'){e.preventDefault();keys.left=true;p.facing='left';updateInputTime();}},{passive:false});
-document.getElementById('tzL').addEventListener('touchend',  e=>{if(gameState==='PLAY'){e.preventDefault();keys.left=false;updateInputTime();}},{passive:false});
-document.getElementById('tzR').addEventListener('touchstart',e=>{if(gameState==='PLAY'){e.preventDefault();keys.right=true;p.facing='right';updateInputTime();}},{passive:false});
-document.getElementById('tzR').addEventListener('touchend',  e=>{if(gameState==='PLAY'){e.preventDefault();keys.right=false;updateInputTime();}},{passive:false});
-
-document.getElementById('tzL').addEventListener('mousedown',()=>{keys.left=true;p.facing='left';updateInputTime();}); 
-document.getElementById('tzL').addEventListener('mouseup',()=>{keys.left=false;updateInputTime();});
-document.getElementById('tzR').addEventListener('mousedown',()=>{keys.right=true;p.facing='right';updateInputTime();}); 
-document.getElementById('tzR').addEventListener('mouseup',()=>{keys.right=false;updateInputTime();});
-
-const chatFabBtn = document.getElementById('chatFabBtn'), chatPopup  = document.getElementById('chatPopup');
-chatFabBtn.onclick = () => chatPopup.classList.toggle('open');
-document.querySelectorAll('.qc-btn').forEach(btn => { btn.onclick = () => { sendChat(btn.textContent); chatPopup.classList.remove('open'); }; });
-document.getElementById('chatSend').onclick = () => { let v = document.getElementById('chatTxt').value.trim(); if (v) { sendChat(v); document.getElementById('chatTxt').value=''; chatPopup.classList.remove('open'); } };
-document.getElementById('chatTxt').addEventListener('keypress', e => { updateInputTime(); if (e.key==='Enter') { let v = e.target.value.trim(); if (v) { sendChat(v); e.target.value=''; chatPopup.classList.remove('open'); } } });
-document.addEventListener('click', e => { if (!document.getElementById('chatFab').contains(e.target)) chatPopup.classList.remove('open'); });
-
-// LOAD DARI LOCALSTORAGE SAAT PERTAMA BUKA
+// AUTO LOAD NAMA & WARNA SAAT WEB DIBUKA
 let savedName = localStorage.getItem('doodle_name');
 let savedColor = localStorage.getItem('doodle_color');
 if (savedName) document.getElementById('nameInput').value = savedName;
@@ -888,8 +857,33 @@ if (savedColor) {
     });
 }
 
+window.addEventListener('keydown', e => { 
+    let ci = document.getElementById('chatTxt'); if (document.activeElement === ci) return; 
+    if (e.key==='ArrowLeft'||e.key==='a') { keys.left=true; p.facing='left'; }
+    if (e.key==='ArrowRight'||e.key==='d') { keys.right=true; p.facing='right'; }
+});
+window.addEventListener('keyup', e => { 
+    if (e.key==='ArrowLeft'||e.key==='a') keys.left=false; 
+    if (e.key==='ArrowRight'||e.key==='d') keys.right=false; 
+});
+
+document.getElementById('tzL').addEventListener('touchstart',e=>{if(gameState==='PLAY'){e.preventDefault();keys.left=true;p.facing='left';}},{passive:false});
+document.getElementById('tzL').addEventListener('touchend',  e=>{if(gameState==='PLAY'){e.preventDefault();keys.left=false;}},{passive:false});
+document.getElementById('tzR').addEventListener('touchstart',e=>{if(gameState==='PLAY'){e.preventDefault();keys.right=true;p.facing='right';}},{passive:false});
+document.getElementById('tzR').addEventListener('touchend',  e=>{if(gameState==='PLAY'){e.preventDefault();keys.right=false;}},{passive:false});
+document.getElementById('tzL').addEventListener('mousedown',()=>{keys.left=true;p.facing='left';}); 
+document.getElementById('tzL').addEventListener('mouseup',()=>{keys.left=false;});
+document.getElementById('tzR').addEventListener('mousedown',()=>{keys.right=true;p.facing='right';}); 
+document.getElementById('tzR').addEventListener('mouseup',()=>{keys.right=false;});
+
+const chatFabBtn = document.getElementById('chatFabBtn'), chatPopup  = document.getElementById('chatPopup');
+chatFabBtn.onclick = () => chatPopup.classList.toggle('open');
+document.querySelectorAll('.qc-btn').forEach(btn => { btn.onclick = () => { sendChat(btn.textContent); chatPopup.classList.remove('open'); }; });
+document.getElementById('chatSend').onclick = () => { let v = document.getElementById('chatTxt').value.trim(); if (v) { sendChat(v); document.getElementById('chatTxt').value=''; chatPopup.classList.remove('open'); } };
+document.getElementById('chatTxt').addEventListener('keypress', e => { if (e.key==='Enter') { let v = e.target.value.trim(); if (v) { sendChat(v); e.target.value=''; chatPopup.classList.remove('open'); } } });
+document.addEventListener('click', e => { if (!document.getElementById('chatFab').contains(e.target)) chatPopup.classList.remove('open'); });
+
 lbFetch(); loop();
 </script>
 </body>
 </html>
-
