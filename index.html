@@ -240,8 +240,8 @@
 const UPSTASH_URL   = "https://intense-calf-74085.upstash.io";
 const UPSTASH_TOKEN = "gQAAAAAAASFlAAIgcDJjODE2YjZiYjg3OWE0M2NiOTBlMTY5MzRkODBmNzU4Nw";
 const ABLY_KEY      = '4opURQ.FVPiqg:z5W8zQxWoBNlXmlAXvOv4Bz1bmn_ISnFucJGpjFijS8';
-const LB_KEY        = 'doodle_mmo_lb_v4';
-const NAMES_KEY     = 'doodle_mmo_names_v4';
+const LB_KEY        = 'doodle_mmo_lb_v5'; // Update key untuk format leaderboard baru
+const NAMES_KEY     = 'doodle_mmo_names_v5';
 const SAVE_KEY      = 'doodle_mmo_save_state';
 const EXPIRE_MS     = 7 * 24 * 60 * 60 * 1000;
 
@@ -281,7 +281,10 @@ let p = {
 
 let peers = {}, platforms = new Map(), stars = new Map(), items = new Map(), particles = [];
 let camY = 0, currentMeters = 0, displayScore = 0, highScore = parseInt(localStorage.getItem('doodle_hs_meters') || '0');
-let lastSubmittedScore = 0; // Untuk update leaderboard realtime tanpa nunggu mati
+let runMaxMeters = 0; // Menyimpan batas tertinggi permainan saat ini
+let lastSubmittedMeters = 0; // Mencegah spam upload
+let lastLbSubmitTime = 0; // Timer debounce upload
+let isSubmittingLB = false;
 
 const GRAVITY = 0.55, JUMP_FORCE = -14, SPRING_FORCE = -20, TRAMPOLINE_FORCE = -25, FLY_FORCE = -20, ROCKET_FORCE = -30, BUMPER_FORCE = -17, BOOST_FORCE = -30;
 const TERMINAL_V = 18, FALL_V = 35, MOVE_SPEED = 9, PLAT_GAP = 115;
@@ -297,7 +300,7 @@ function getMedalSVG(rank) {
     return `<svg width="18" height="18" viewBox="0 0 24 24" fill="${c}" stroke="${s}" stroke-width="2"><circle cx="12" cy="12" r="10"/><text x="12" y="16" font-size="12" font-family="Nunito" font-weight="900" text-anchor="middle" fill="${s}" stroke="none">${rank}</text></svg>`;
 }
 
-// ── UPSTASH & LEADERBOARD (BACKGROUND SYNC) ──
+// ── UPSTASH & LEADERBOARD ──
 async function upGet(k) { try { let r = await fetch(`${UPSTASH_URL}/get/${k}`, {headers:{Authorization:`Bearer ${UPSTASH_TOKEN}`}}); let d = await r.json(); return d.result?JSON.parse(d.result):null; }catch(e){return null;} }
 async function upSet(k,v) { try { await fetch(`${UPSTASH_URL}/set/${k}/${encodeURIComponent(JSON.stringify(v))}`, {headers:{Authorization:`Bearer ${UPSTASH_TOKEN}`}}); }catch(e){} }
 
@@ -314,11 +317,17 @@ async function lbFetch() {
 }
 
 async function lbSubmit(name, sc) {
-    let now = Date.now(); let idx = leaderboard.findIndex(e => e.name.toLowerCase() === name.toLowerCase());
-    if (idx >= 0) { leaderboard[idx].lastActive = now; if (sc > leaderboard[idx].score) leaderboard[idx].score = sc; }
-    else { leaderboard.push({ name, score: sc, lastActive: now }); }
-    leaderboard.sort((a,b) => b.score - a.score); if (leaderboard.length > 10) leaderboard = leaderboard.slice(0, 10);
-    lbLocalSave(); await upSet(LB_KEY, leaderboard); renderLB();
+    if (isSubmittingLB) return;
+    isSubmittingLB = true;
+    try {
+        let now = Date.now(); let idx = leaderboard.findIndex(e => e.name.toLowerCase() === name.toLowerCase());
+        if (idx >= 0) { leaderboard[idx].lastActive = now; if (sc > leaderboard[idx].score) leaderboard[idx].score = sc; }
+        else { leaderboard.push({ name, score: sc, lastActive: now }); }
+        leaderboard.sort((a,b) => b.score - a.score); if (leaderboard.length > 10) leaderboard = leaderboard.slice(0, 10);
+        lbLocalSave(); await upSet(LB_KEY, leaderboard); renderLB();
+    } finally {
+        isSubmittingLB = false;
+    }
 }
 
 async function checkNameAvailable(name) {
@@ -353,7 +362,7 @@ function saveState() {
     if (gameState === 'PLAY' && p.y < GROUND_Y - 100) {
         localStorage.setItem(SAVE_KEY, JSON.stringify({ 
             x: p.x, y: p.y, camY: camY, score: currentMeters, 
-            stars: p.starCharges, shield: p.hasShield 
+            stars: p.starCharges, shield: p.hasShield, runMaxMeters: runMaxMeters
         }));
     }
 }
@@ -362,37 +371,19 @@ window.addEventListener('beforeunload', saveState);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveState(); });
 
 
-// ── ABLY MULTIPLAYER (100% SMOOTH INTERPOLATION BUFFER) ──
+// ── ABLY MULTIPLAYER ──
 let ably, chan;
 function connectAbly(name) {
     if (ably) { try { ably.close(); } catch(e){} }
     try {
         ably = new Ably.Realtime({ key: ABLY_KEY, clientId: myId }); 
-        chan = ably.channels.get('doodle-mmo-ultimate-v11');
+        chan = ably.channels.get('doodle-mmo-ultimate-v10');
         chan.presence.subscribe(() => { chan.presence.get((err, m) => { if(m) document.getElementById('onlineCnt').textContent = m.length; }); });
-        
         chan.subscribe('sync', msg => {
-            if (msg.clientId === myId) return; 
-            let d = msg.data, id = msg.clientId;
-            let now = Date.now();
-
-            if (!peers[id]) {
-                peers[id] = { buffer: [], chatTimer: 0, chatMsg: '', lastSeen: now, x: d.x, y: d.y };
-            }
-            
-            // Masukkan data baru ke Interpolation Buffer
-            peers[id].buffer.push({
-                t: now, x: d.x, y: d.y, vx: d.vx, vy: d.vy,
-                idl: d.idl, c: d.c, n: d.n, sx: d.sx, sy: d.sy,
-                f: d.f, fly: d.fly, rocket: d.rocket, ss: d.ss,
-                sh: d.sh, s: d.s, stun: d.stun, fl: d.fl
-            });
-
-            // Jaga ukuran buffer tetap kecil agar performa aman
-            if (peers[id].buffer.length > 8) peers[id].buffer.shift();
-            peers[id].lastSeen = now;
+            if (msg.clientId === myId) return; let d = msg.data, id = msg.clientId;
+            if (!peers[id]) peers[id] = { x: d.x, y: d.y, chatTimer: 0, chatMsg: '' };
+            Object.assign(peers[id], d, { tx: d.x, ty: d.y, tvx: d.vx, tvy: d.vy, lastSeen: Date.now() });
         });
-
         chan.subscribe('chat', msg => {
             if (msg.clientId === myId) { p.chatMsg = msg.data.t; p.chatTimer = 160; }
             else if (peers[msg.clientId]) { peers[msg.clientId].chatMsg = msg.data.t; peers[msg.clientId].chatTimer = 160; }
@@ -412,24 +403,10 @@ function publishSync() {
     });
 }
 function sendChat(t) { if (!t) return; if (chan) chan.publish('chat', { t }); else { p.chatMsg = t; p.chatTimer = 160; } }
-
-// Update Rate Ditingkatkan menjadi 25 FPS (40ms) untuk mensupport Buffer Interpolasi Mulus
-setInterval(() => { 
-    publishSync(); 
-    let now = Date.now(); 
-    for (let id in peers) if (now - peers[id].lastSeen > 4000) delete peers[id]; 
-}, 40); 
-
-// BACKGROUND SYNC LEADERBOARD (Tiap 10 Detik jika mendapat skor baru)
-setInterval(() => {
-    if (gameState === 'PLAY' && currentMeters > lastSubmittedScore + 5) {
-        lastSubmittedScore = currentMeters;
-        lbSubmit(playerName, currentMeters);
-    }
-}, 10000);
+setInterval(() => { publishSync(); let now = Date.now(); for (let id in peers) if (now - peers[id].lastSeen > 4000) delete peers[id]; }, 50); 
 
 
-// ── MAP GEN (ZIG-ZAG ANTI STUCK) ──
+// ── MAP GEN ──
 function mulberry32(seed) { return function() { let t = seed += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 function generateLevel(lvl) {
@@ -459,14 +436,18 @@ function generateLevel(lvl) {
     let item = null, hasStar = false;
     if (!['spike','portal','bumper','cloud'].includes(type)) {
         if (lvl > 5 && lvl % 15 === 0) {
-            if (r4 > .75) item = 'rocket'; else if (r4 > .50) item = 'hat'; else if (r4 > .25) item = 'shoes'; else item = 'shield';
+            // Drop rate powerup diseimbangkan (Sepatu & Shield lebih banyak)
+            if (r4 > .92) item = 'rocket'; // Langka
+            else if (r4 > .84) item = 'hat'; // Langka
+            else if (r4 > .42) item = 'shoes'; // Sering
+            else item = 'shield'; // Sering
         } else if (r4 > .92) hasStar = true; 
     }
     return { type, x: px, y: py, w: pw, item, hasStar, baseX: px };
 }
 
 // ── PLATFORMS & ITEMS ──
-const PLAT_COLORS = { normal: '#86efac', moving: '#60a5fa', spring: '#fde047', trampoline: '#fca5a5', fragile: '#fbbf24', blinking: '#67e8f9', portal: 'transparent', spike: '#f87171', bumper: '#e879f9', ground: '#4ade80' };
+const PLAT_COLORS = { normal: '#86efac', moving: '#60a5fa', spring: '#fde047', trampoline: '#fca5a5', fragile: '#fbbf24', blinking: '#67e8f9', portal: 'transparent', spike: '#f87171', bumper: '#e879f9', ground: '#4ade80', cloud: 'transparent' };
 
 class Platform {
     constructor(lvl, data) {
@@ -616,13 +597,12 @@ function resetGame(keepPosition = false, resume = false) {
         let saved = resume ? JSON.parse(localStorage.getItem(SAVE_KEY) || 'null') : null;
         if (saved && saved.y < GROUND_Y - 100) {
             p.x = saved.x; p.y = saved.y; camY = saved.camY; currentMeters = saved.score; displayScore = currentMeters;
-            p.starCharges = saved.stars || 0; p.hasShield = saved.shield || false;
-            lastSubmittedScore = currentMeters;
+            p.starCharges = saved.stars || 0; p.hasShield = saved.shield || false; runMaxMeters = saved.runMaxMeters || currentMeters;
         } else {
-            p.x = MAP_W/2; p.y = GROUND_Y - 80; camY = GROUND_Y - H + 20; currentMeters = 0; displayScore = 0;
+            p.x = MAP_W/2; p.y = GROUND_Y - 80; camY = GROUND_Y - H + 20; currentMeters = 0; displayScore = 0; runMaxMeters = 0;
             p.starCharges = 0; p.hasShield = false;
-            lastSubmittedScore = 0;
         }
+        lastSubmittedMeters = runMaxMeters;
     }
     
     buildMap(); 
@@ -710,7 +690,7 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, ssT
 
 function updateLiveTopUI() {
     let allPlayers = [{ n: playerName, s: currentMeters }];
-    for (let id in peers) allPlayers.push({ n: peers[id].buffer.length ? peers[id].buffer[peers[id].buffer.length-1].n : '', s: peers[id].buffer.length ? peers[id].buffer[peers[id].buffer.length-1].s : 0 });
+    for (let id in peers) allPlayers.push({ n: peers[id].n, s: peers[id].s || 0 });
     allPlayers.sort((a,b) => b.s - a.s); let top5 = allPlayers.slice(0, 5);
     document.getElementById('liveTopName').textContent = top5[0].s === 0 ? "-" : top5[0].n;
     document.getElementById('liveTopScore').textContent = top5[0].s + 'm';
@@ -721,6 +701,20 @@ function updateLiveTopUI() {
             <span class="lb-score" style="font-size:0.85rem; color:#b45309;">${p.s}m</span>
         </div>
     `).join('');
+}
+
+function getJumpForce() {
+    let f = JUMP_FORCE;
+    // Bintang langsung habis 1 kali pakai
+    if (p.starCharges > 0) {
+        f = BOOST_FORCE;
+        p.starCharges--;
+        spawnParticles(p.x, p.y, '#fbbf24', 25);
+        floatText(p.x, p.y, 'SUPER JUMP!', '#f59e0b');
+    } else if (p.springShoesTimer > 0) {
+        f = JUMP_FORCE * 1.3;
+    }
+    return f;
 }
 
 function loop() {
@@ -737,10 +731,25 @@ function loop() {
     else if (p.starCharges > 0) { pwrCon.style.display='block'; pwrFill.style.width='100%'; pwrFill.style.background='#fbbf24'; }
     else { pwrCon.style.display = 'none'; }
 
-    // ── METER COUNTDOWN (KETINGGIAN Mulus) ──
+    // ── METER COUNTDOWN & LEADERBOARD REALTIME RACE ──
     currentMeters = Math.max(0, Math.floor((GROUND_Y - p.y) / 50));
-    if (gameState === 'PLAY' && currentMeters > highScore) { 
-        highScore = currentMeters; document.getElementById('highScoreVal').textContent = highScore + 'm'; localStorage.setItem('doodle_hs_meters', highScore); 
+    if (currentMeters > runMaxMeters) runMaxMeters = currentMeters; // Catat puncak tertinggi di run ini
+    
+    if (gameState === 'PLAY') {
+        if (runMaxMeters > highScore) { 
+            highScore = runMaxMeters; document.getElementById('highScoreVal').textContent = highScore + 'm'; localStorage.setItem('doodle_hs_meters', highScore); 
+        }
+        
+        // Cek update realtime jika player menembus posisi top 10 (Setiap selisih skor dan debounce 3 dtk)
+        let lbThreshold = leaderboard.length < 10 ? 0 : leaderboard[leaderboard.length - 1].score;
+        if (runMaxMeters > lbThreshold && runMaxMeters > lastSubmittedMeters) {
+            let now = Date.now();
+            if (now - lastLbSubmitTime > 3000) { // Throttle upload tiap 3 detik
+                lbSubmit(playerName, runMaxMeters);
+                lastSubmittedMeters = runMaxMeters;
+                lastLbSubmitTime = now;
+            }
+        }
     }
     
     if (displayScore < currentMeters) displayScore = currentMeters; 
@@ -765,14 +774,11 @@ function loop() {
         let targetVx = 0;
         if (p.isIdle) {
             p.vx = 0; p.vy = 0; p.idleBreath += .06; p.scaleX = 1+Math.sin(p.idleBreath)*.05; p.scaleY = 1-Math.sin(p.idleBreath)*.03;
+            // Jika mulai bergerak, langsung lompat (dan konsumsi bintang jika ada)
             if (keys.left || keys.right) { 
                 p.isIdle = false; p.currentPlatform = null; 
-                let f = JUMP_FORCE;
-                if (p.starCharges > 0) {
-                    f = BOOST_FORCE; p.starCharges--;
-                    spawnParticles(p.x, p.y, '#fbbf24', 25); floatText(p.x, p.y, 'SUPER JUMP!', '#f59e0b');
-                } else if (p.springShoesTimer > 0) { f = JUMP_FORCE * 1.3; }
-                p.vy = f; spawnParticles(p.x, p.y, '#e2e8f0', 4); 
+                p.vy = getJumpForce(); 
+                spawnParticles(p.x, p.y, '#e2e8f0', 4); 
             }
         } else {
             if (keys.left) { targetVx = -MOVE_SPEED; p.facing = 'left'; }
@@ -787,26 +793,30 @@ function loop() {
 
         if (!p.isIdle) { let tSy = 1, tSx = 1; if (p.vy < -5) { tSy=1.18; tSx=.88; } else if (p.vy > 5) { tSy=1.06; tSx=.96; } p.scaleX += (tSx-p.scaleX)*.2; p.scaleY += (tSy-p.scaleY)*.2; }
 
+        // Memicu jatuh bebas jika keluar layar bawah
         if (gameState === 'PLAY' && p.y > camY + H + 50 && !p.isFreeFalling) {
             p.isFreeFalling = true;
             p.chatMsg = 'AAAAAA!!!'; p.chatTimer = 100; if (chan) chan.publish('chat',{t:'AAAAAA!!!'});
         }
 
-        // Hantam Tanah
+        // Hantam Tanah (Ground) - Submit score akhir dan mati
         if (p.y >= GROUND_Y) {
             p.y = GROUND_Y;
             if (p.isFreeFalling) {
+                // Jatuh dari luar layar (Free Fall) -> STUN
                 p.vy = 0; p.vx = 0; p.isFreeFalling = false;
                 p.scaleX = 1.6; p.scaleY = 0.4; p.stunTimer = 80; 
                 spawnParticles(p.x, GROUND_Y, '#ef4444', 40);
                 p.chatMsg = 'Aduh... x_x'; p.chatTimer = 100;
                 if (chan) chan.publish('chat', {t: 'Aduh... x_x'});
-                lbSubmit(playerName, Math.max(0, currentMeters)); clearState(); 
+                lbSubmit(playerName, Math.max(0, runMaxMeters)); // Paksa submit hasil highscore run ini
+                clearState(); 
             } else if (p.vy > 0 && p.stunTimer <= 0) {
                 if (!keys.left && !keys.right) { 
-                    p.isIdle = true; p.currentPlatform = null; p.idleBreath = 0; p.platOffsetX = 0; p.vy = 0; p.vx = 0; 
+                    p.isIdle = true; p.currentPlatform = null; 
+                    p.idleBreath = 0; p.platOffsetX = 0; p.vy = 0; p.vx = 0; 
                 } else { 
-                    let f = p.springShoesTimer > 0 ? JUMP_FORCE*1.3 : JUMP_FORCE; p.vy = f; p.scaleX = 1.35; p.scaleY = .7; 
+                    p.vy = getJumpForce(); p.scaleX = 1.35; p.scaleY = .7; 
                 }
                 spawnParticles(p.x, p.y+5, '#e2e8f0', 4);
             }
@@ -814,10 +824,14 @@ function loop() {
     }
 
     // ── KAMERA ──
-    if (p.isFreeFalling) { camY += ((p.y - H/2) - camY) * 0.15; } 
-    else if (gameState === 'PLAY') { let tCam = p.y - H*.52; if (tCam < camY) camY += (tCam-camY)*.22; }
+    if (p.isFreeFalling) {
+        camY += ((p.y - H/2) - camY) * 0.15; 
+    } else if (gameState === 'PLAY') {
+        let tCam = p.y - H*.52; if (tCam < camY) camY += (tCam-camY)*.22;
+    }
 
-    let maxCamY = GROUND_Y - H + 20; if (camY > maxCamY) camY = maxCamY;
+    let maxCamY = GROUND_Y - H + 20;
+    if (camY > maxCamY) camY = maxCamY;
 
     let topLvl = Math.floor((GROUND_Y - camY + H) / PLAT_GAP) + 5; 
     let botLvl = Math.max(0, Math.floor((GROUND_Y - (camY+H)) / PLAT_GAP) - 3);
@@ -830,19 +844,37 @@ function loop() {
     for (let [k,pl] of platforms) { pl.update(); pl.draw(); }
 
     if (gameState === 'PLAY') {
+        // Cek status prioritas (Terbang pakai roket / baling-baling)
+        let isFlying = p.flyTimer > 0 || p.rocketTimer > 0;
+
         if (!p.isFreeFalling) {
             for (let [k,s] of stars) {
-                if (p.collectedLoot.has(s.id)) continue; s.update(); s.draw();
-                if (p.flyTimer<=0 && p.rocketTimer<=0 && Math.abs(p.x-s.x)<34 && p.y>s.y-34 && p.y<s.y+20) { 
-                    p.collectedLoot.add(s.id); p.starCharges = 1; 
-                    spawnParticles(s.x, s.y, '#fbbf24', 12); floatText(s.x, s.y, 'BINTANG AKTIF!', '#f59e0b'); 
+                if (p.collectedLoot.has(s.id)) continue; 
+                // Jika sedang terbang dengan roket/topi, sembunyikan (tidak dirender & tidak bisa diambil)
+                if (!isFlying) {
+                    s.update(); s.draw();
+                    // DAPAT BINTANG (Menimpa buff lain)
+                    if (Math.abs(p.x-s.x)<34 && p.y>s.y-34 && p.y<s.y+20) { 
+                        p.collectedLoot.add(s.id); 
+                        
+                        // Bersihkan Powerup lain (Mutlak)
+                        p.flyTimer=0; p.rocketTimer=0; p.springShoesTimer=0; p.starCharges=1; 
+                        
+                        spawnParticles(s.x, s.y, '#fbbf24', 12); floatText(s.x, s.y, 'BINTANG AKTIF!', '#f59e0b'); 
+                    }
                 }
             }
             for (let [k,it] of items) {
-                if (p.collectedLoot.has(it.id)) continue; it.update(); it.draw();
-                if (p.flyTimer <= 0 && p.rocketTimer <= 0) {
+                if (p.collectedLoot.has(it.id)) continue; 
+                // Jika terbang pakai roket/topi, sembunyikan
+                if (!isFlying) {
+                    it.update(); it.draw();
                     if (Math.abs(p.x-it.x)<36 && p.y>it.y-36 && p.y<it.y+22) {
                         p.collectedLoot.add(it.id); spawnParticles(it.x, it.y, '#fff', 16);
+                        
+                        // Bersihkan buff sebelumnya jika ambil item baru
+                        p.flyTimer=0; p.rocketTimer=0; p.springShoesTimer=0; p.starCharges=0; p.hasShield=false;
+                        
                         if (it.type==='hat') { p.flyTimer=150; floatText(it.x,it.y,'TERBANG!','#60a5fa'); } 
                         if (it.type==='rocket') { p.rocketTimer=80; floatText(it.x,it.y,'ROKET!','#ef4444'); } 
                         if (it.type==='shoes') { p.springShoesTimer=600; floatText(it.x,it.y,'SEPATU PEGAS!','#22c55e'); }
@@ -851,30 +883,40 @@ function loop() {
                 }
             }
         } else {
-            for (let [k,s] of stars) if(!p.collectedLoot.has(s.id)) s.draw();
-            for (let [k,it] of items) if(!p.collectedLoot.has(it.id)) it.draw();
+            // Hanya gambar tanpa collider saat free falling (kalau tidak terbang)
+            if (!isFlying) {
+                for (let [k,s] of stars) if(!p.collectedLoot.has(s.id)) s.draw();
+                for (let [k,it] of items) if(!p.collectedLoot.has(it.id)) it.draw();
+            }
         }
     }
 
+    // Menginjak platform
     if (gameState === 'PLAY' && p.vy > 0 && p.flyTimer<=0 && p.rocketTimer<=0 && !p.isIdle && !p.isFreeFalling) {
         for (let [k,pl] of platforms) {
             if (pl.broken || !pl.isSolid || pl.y > camY + H + 10) continue; 
             let rx = pl.type==='moving' ? pl.x : pl.x;
             if (p.x+16 > rx && p.x-16 < rx+pl.w && p.oldY <= pl.y+8 && p.y >= pl.y-6) {
+                // LOGIKA AWAN JATUH TEMBUS
+                if (pl.type==='cloud') { 
+                    if (!pl.broken) { pl.broken=true; spawnParticles(rx+pl.w/2,pl.y,'#fff',15); }
+                    continue; // Bypass setting p.y (Biar tembus jatuh ke bawah)
+                }
+
                 p.y = pl.y;
                 if (pl.type==='portal') { spawnParticles(p.x, p.y, '#a855f7', 18); p.y -= 900; camY -= 900; p.vy = JUMP_FORCE; break; }
-                if (pl.type==='cloud') { pl.broken=true; spawnParticles(rx+pl.w/2,pl.y,'#fff',15); let f=p.springShoesTimer>0?JUMP_FORCE*1.3:JUMP_FORCE; p.vy=f; p.scaleX=1.35; p.scaleY=.7; break; }
                 if (pl.type==='spike') { 
                     if (p.hasShield) { p.hasShield = false; p.vy = BUMPER_FORCE; spawnParticles(p.x, p.y, '#06b6d4', 20); floatText(p.x, p.y, 'PERISAI PECAH!', '#06b6d4'); }
                     else { spawnParticles(p.x, p.y, '#ef4444', 12); p.vy = BUMPER_FORCE; p.vx = (Math.random()>.5?8:-8); p.chatMsg='Aduh!!'; p.chatTimer=80; if(chan)chan.publish('chat',{t:'Aduh!!'}); }
                     break; 
                 }
                 if (pl.type==='bumper') { p.vy = BUMPER_FORCE; p.vx = (p.x < rx+pl.w/2) ? -10 : 10; spawnParticles(p.x,p.y,'#f0abfc',10); pl.bounceAnim=15; break; }
-                if (pl.type==='fragile') { pl.broken=true; pl.restoreTimer=180; spawnParticles(rx+pl.w/2,pl.y,pl.color,12); let f=p.springShoesTimer>0?JUMP_FORCE*1.3:JUMP_FORCE; p.vy=f; p.scaleX=1.35; p.scaleY=.7; break; }
+                if (pl.type==='fragile') { pl.broken=true; pl.restoreTimer=180; spawnParticles(rx+pl.w/2,pl.y,pl.color,12); p.vy=getJumpForce(); p.scaleX=1.35; p.scaleY=.7; break; }
                 if (pl.type==='spring') { p.vy=SPRING_FORCE; p.scaleX=1.4; p.scaleY=.65; pl.bounceAnim=15; spawnParticles(p.x,p.y,'#fde047',6); break; }
                 if (pl.type==='trampoline') { p.vy=TRAMPOLINE_FORCE; p.scaleX=1.5; p.scaleY=.55; pl.bounceAnim=15; spawnParticles(p.x,p.y,'#fca5a5',8); break; }
+                
                 if (!keys.left && !keys.right) { p.isIdle=true; p.currentPlatform=pl; p.idleBreath=0; p.platOffsetX = p.x - pl.x; } 
-                else { let f=p.springShoesTimer>0?JUMP_FORCE*1.3:JUMP_FORCE; p.vy=f; p.scaleX=1.35; p.scaleY=.7; }
+                else { p.vy=getJumpForce(); p.scaleX=1.35; p.scaleY=.7; }
                 spawnParticles(p.x, p.y+5, '#e2e8f0', 4); break;
             }
         }
@@ -890,47 +932,17 @@ function loop() {
         ctx.fill(); ctx.globalAlpha=1;
     }
 
-    // ── MULTIPLAYER 100% SMOOTH INTERPOLATION (NO STUTTER) ──
-    let renderDelay = 100; // 100ms visual buffer untuk transisi pergerakan sempurna 60fps
-    let renderTime = Date.now() - renderDelay;
-
+    // ── MULTIPLAYER PREDICTION ──
     for (let id in peers) {
-        let op = peers[id];
-        let buf = op.buffer;
-        
-        if (!buf || buf.length === 0) continue;
-
-        let s0 = null, s1 = null;
-        let targetX, targetY, targetSx, targetSy;
-        let refState = buf[buf.length - 1]; // State terbaru sebagai referensi
-
-        // Temukan titik sebelum dan sesudah waktu Render
-        for (let i = 0; i < buf.length - 1; i++) {
-            if (buf[i].t <= renderTime && buf[i+1].t >= renderTime) {
-                s0 = buf[i]; s1 = buf[i+1]; break;
-            }
+        let op=peers[id]; 
+        if (op.tx!==undefined) { 
+            op.tx += (op.tvx || 0); op.ty += (op.tvy || 0);
+            if (!op.idl && !op.fly && !op.rocket && !op.stun && !op.fl) { op.tvy += GRAVITY; if (op.tvy > FALL_V) op.tvy = FALL_V; }
+            op.x += (op.tx - op.x) * 0.3; op.y += (op.ty - op.y) * 0.3; 
+            if (op.rsx === undefined) { op.rsx = op.sx || 1; op.rsy = op.sy || 1; }
+            op.rsx += ((op.sx || 1) - op.rsx) * 0.2; op.rsy += ((op.sy || 1) - op.rsy) * 0.2;
         }
-
-        if (s0 && s1) {
-            // Kalkulasi Jarak Pergerakan Frame-by-Frame (Linear Interpolation)
-            let ratio = (renderTime - s0.t) / (s1.t - s0.t);
-            targetX = s0.x + (s1.x - s0.x) * ratio;
-            targetY = s0.y + (s1.y - s0.y) * ratio;
-            targetSx = s0.sx + (s1.sx - s0.sx) * ratio;
-            targetSy = s0.sy + (s1.sy - s0.sy) * ratio;
-            refState = s0; 
-        } else {
-            // Jika Lag atau paket belum masuk, gunakan perlambatan transisi untuk mencegah teleportasi kaku
-            if (op.x === undefined) { op.x = refState.x; op.y = refState.y; }
-            targetX = op.x + (refState.x - op.x) * 0.2;
-            targetY = op.y + (refState.y - op.y) * 0.2;
-            targetSx = refState.sx; targetSy = refState.sy;
-        }
-
-        // Simpan posisi layar agar transisi mulus
-        op.x = targetX; op.y = targetY;
-
-        drawCharacter(targetX, targetY, refState.c||'#e2e8f0', targetSx||1, targetSy||1, refState.n, refState.f||'right', refState.fly?30:0, refState.rocket?30:0, refState.ss?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, refState.stun?1:0, refState.fl, refState.sh);
+        if (op.n) drawCharacter(op.x, op.y, op.c||'#e2e8f0', op.rsx||1, op.rsy||1, op.n, op.f||'right', op.fly?30:0, op.rocket?30:0, op.ss?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, op.stun?1:0, op.fl, op.sh);
     }
     
     let isFallingLocal = p.isFreeFalling || p.vy > 10;
