@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -459,15 +458,7 @@ function getLevelData(lvl) {
         else if (r3 > 0.25) type = 'bumper';
     }
 
-    // Pengecoh Awan Palsu (Fake Cloud)
-    let hasDecoy = false, decoyX = 0;
-    if (lvl > 5 && ['normal', 'fragile', 'icy', 'spring'].includes(type) && rng() > 0.65) {
-        hasDecoy = true;
-        if (px < MAP_W / 2) decoyX = Math.min(MAP_W - 60, px + pw + 30 + rng() * 50);
-        else decoyX = Math.max(10, px - 70 - rng() * 50);
-    }
-
-    return { type, pw, px, rng, r4, hasDecoy, decoyX };
+    return { type, pw, px, rng, r4 };
 }
 
 function generateLevel(lvl) {
@@ -510,7 +501,7 @@ function generateLevel(lvl) {
     let speed = 1.5 + d.rng() * 1.5;
     let dir = d.rng() > 0.5 ? 1 : -1;
 
-    return { type, x: d.px, y: GROUND_Y - lvl * PLAT_GAP, w: d.pw, item, hasStar, baseX: d.px, speed, dir, hasDecoy: d.hasDecoy, decoyX: d.decoyX };
+    return { type, x: d.px, y: GROUND_Y - lvl * PLAT_GAP, w: d.pw, item, hasStar, baseX: d.px, speed, dir };
 }
 
 // ── PLATFORMS DRAWING ──
@@ -545,20 +536,6 @@ class Platform {
             this.y = this.startY - (Math.sin((Date.now() + this.lvl * 500) / 600) * 0.5 + 0.5) * (PLAT_GAP * 1.8);
         }
     }
-    drawFakeCloud(cx, cy) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        // Gambar awan fluffy
-        ctx.arc(cx + 15, cy - 2, 12, 0, Math.PI * 2);
-        ctx.arc(cx + 30, cy - 8, 16, 0, Math.PI * 2);
-        ctx.arc(cx + 45, cy - 2, 12, 0, Math.PI * 2);
-        ctx.arc(cx + 30, cy + 4, 12, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
     draw() {
         if (this.type === 'bumper') { this.drawBumper(); return; }
         if (this.type === 'portal') { this.drawPortal(); return; }
@@ -567,9 +544,6 @@ class Platform {
             ctx.save(); ctx.fillStyle = '#22c55e'; ctx.fillRect(this.x, this.y, this.w, H + 2000); 
             ctx.fillStyle = '#166534'; ctx.fillRect(this.x, this.y, this.w, 15); ctx.restore(); return;
         }
-
-        // Gambar awan pengecoh kalau ada
-        if (this.hasDecoy) { this.drawFakeCloud(this.decoyX, this.startY); }
 
         let cx = this.x, cy = this.y, bounce = this.bounceAnim > 0 ? Math.sin((15-this.bounceAnim)/15 * Math.PI) * 5 : 0;
         ctx.save(); 
@@ -998,6 +972,9 @@ function loop() {
             if (pl.type === 'updown') {
                 p.y = pl.y; // Ikut naik turun
             }
+            if (pl.type === 'fragile' && pl.broken) {
+                p.y = pl.y; // Ikut jatuh dengan kayunya
+            }
             
             // Jatuh jika melewati batas ujung platform
             if (p.x < pl.x || p.x > pl.x + pl.w) {
@@ -1006,10 +983,16 @@ function loop() {
         }
 
         if (p.isIdle && (keys.left || keys.right)) { 
-            p.isIdle = false; p.currentPlatform = null; 
-            let f = p.starCharges > 0 ? BOOST_FORCE : JUMP_FORCE;
-            if (p.starCharges > 0) { p.starCharges--; spawnParticles(p.x, p.y, '#fbbf24', 25); floatText(p.x, p.y, 'SUPER JUMP!', '#f59e0b'); }
-            p.vy = f; spawnParticles(p.x, p.y, '#e2e8f0', 5); 
+            p.isIdle = false; 
+            if (p.currentPlatform && p.currentPlatform.type === 'fragile') {
+                p.currentPlatform = null; 
+                // Karakter dibiarkan jatuh, jangan lompat dari kayu hancur
+            } else {
+                p.currentPlatform = null; 
+                let f = p.starCharges > 0 ? BOOST_FORCE : JUMP_FORCE;
+                if (p.starCharges > 0) { p.starCharges--; spawnParticles(p.x, p.y, '#fbbf24', 25); floatText(p.x, p.y, 'SUPER JUMP!', '#f59e0b'); }
+                p.vy = f;
+            }
         }
     } else {
         if (keys.left) { targetVx = -MOVE_SPEED; p.facing = 'left'; }
@@ -1068,7 +1051,6 @@ function loop() {
             if (!keys.left && !keys.right) { 
                 p.isIdle = true; p.currentPlatform = null; p.idleBreath = 0; p.platOffsetX = 0; p.vy = 0; p.vx = 0; p.hasDJ = true;
             } else { p.vy = JUMP_FORCE; p.hasDJ = true; }
-            spawnParticles(p.x, p.y+5, '#e2e8f0', 5);
         }
     }
 
@@ -1135,8 +1117,8 @@ function loop() {
                 p.y = hitY; p.hasDJ = true;
 
                 if (pl.type==='portal') { spawnParticles(p.x, p.y, '#a855f7', 20); p.y -= 1000; camY -= 1000; p.vy = JUMP_FORCE; break; }
-                if (pl.type==='bumper') { p.vy = BUMPER_FORCE; p.vx = (p.x < rx+pl.w/2) ? -12 : 12; spawnParticles(p.x,p.y,'#f0abfc',12); pl.bounceAnim=15; break; }
-                if (pl.type==='fragile') { pl.broken=true; pl.restoreTimer=150; spawnParticles(rx+pl.w/2,pl.y,'#f59e0b',15); p.vy=JUMP_FORCE; break; }
+                if (pl.type==='bumper') { p.vy = BUMPER_FORCE; p.vx = (p.x < rx+pl.w/2) ? -16 : 16; spawnParticles(p.x,p.y,'#f0abfc',12); pl.bounceAnim=15; break; }
+                if (pl.type==='fragile') { pl.broken=true; pl.restoreTimer=150; spawnParticles(rx+pl.w/2,pl.y,'#f59e0b',15); p.isIdle=true; p.currentPlatform=pl; p.idleBreath=0; p.platOffsetX=p.x-pl.x; p.vy=0; break; }
                 if (pl.type==='spring') { p.vy=SPRING_FORCE; pl.bounceAnim=15; spawnParticles(p.x,p.y,'#fde047',8); break; }
                 if (pl.type==='trampoline') { p.vy=TRAMPOLINE_FORCE; pl.bounceAnim=15; spawnParticles(p.x,p.y,'#fca5a5',10); break; }
                 
@@ -1145,7 +1127,7 @@ function loop() {
                 } else { 
                     p.vy=JUMP_FORCE; p.currentPlatform=pl; 
                 }
-                spawnParticles(p.x, p.y+5, '#e2e8f0', 5); break;
+                break;
             }
         }
     }
@@ -1190,7 +1172,8 @@ function loop() {
         
         op.x += (targetX - op.x) * 0.3; op.y += (targetY - op.y) * 0.3;
 
-        drawCharacter(op.x, op.y, refState.c||'#f8fafc', targetSx||1, targetSy||1, refState.n, refState.f||'right', refState.fly?30:0, refState.rocket?30:0, refState.dj?30:0, refState.bl?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, refState.fl, refState.ct||'doodle', refState.ht);
+        let peerExprT = Math.floor(Date.now() / 16) + (id.charCodeAt(id.length-1) * 33);
+        drawCharacter(op.x, op.y, refState.c||'#f8fafc', targetSx||1, targetSy||1, refState.n, refState.f||'right', refState.fly?30:0, refState.rocket?30:0, refState.dj?30:0, refState.bl?30:0, false, op.chatMsg||'', op.chatTimer||0, peerExprT, refState.fl, refState.ct||'doodle', refState.ht);
     }
     
     let isFallingLocal = p.isFreeFalling || p.vy > 8;
@@ -1255,4 +1238,3 @@ lbFetch(); loop();
 </script>
 </body>
 </html>
-
