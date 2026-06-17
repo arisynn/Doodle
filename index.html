@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Doodle MMO — Ultimate</title>
+    <title>Doodle MMO — Play With Friends!</title>
     <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Nunito:wght@700;900&display=swap');
@@ -17,16 +17,28 @@
             position:relative; width:100%; height:100%; max-width:460px;
             background: linear-gradient(180deg, #e0e7ff 0%, #f8fafc 100%);
             overflow:hidden; box-shadow:0 0 40px rgba(0,0,0,0.6);
+            transition: background 0.5s ease; /* Transisi warna langit */
         }
         @media (min-width: 480px) {
             #gameContainer { height:95vh; border-radius:24px; border:8px solid #0f172a; }
         }
 
+        /* Efek Getar Saat Jatuh */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            100% { transform: translate(0px, 0px) rotate(0deg); }
+        }
+        .shake-effect { animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
+
         .bg-grid{position:absolute;inset:0;z-index:0;pointer-events:none;
-            background-image:linear-gradient(#94a3b830 1.5px,transparent 1.5px),linear-gradient(90deg,#94a3b830 1.5px,transparent 1.5px);
+            background-image:linear-gradient(rgba(255,255,255,0.1) 1.5px,transparent 1.5px),linear-gradient(90deg,rgba(255,255,255,0.1) 1.5px,transparent 1.5px);
             background-size:45px 45px;}
         .bg-grid::before{content:'';position:absolute;inset:0;
-            background:radial-gradient(ellipse 80% 60% at 50% 0%,#c7d2fe70,transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%,#fce7f370,transparent 60%);}
+            background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.4), transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%, rgba(255,255,255,0.2), transparent 60%);}
 
         canvas{position:absolute;inset:0;width:100%;height:100%;z-index:1;}
 
@@ -70,7 +82,16 @@
         @keyframes popIn{from{opacity:0;transform:translateY(20px) scale(.9)}to{opacity:1;transform:translateY(0) scale(1)}}
         .modal h1{font-size:2.4rem;font-family:'Nunito',sans-serif;font-weight:900;line-height:1;color:#1e293b;}
         .modal h1 span{color:#3b82f6;}
-        .modal-sub{font-size:.75rem;letter-spacing:.15em;text-transform:uppercase;color:#64748b;margin:4px 0 16px;font-weight:900;}
+        
+        /* INSTAGRAM LINK */
+        .modal-sub {
+            display: inline-block; font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; 
+            color:#64748b; margin:6px 0 16px; font-weight:900; text-decoration: none;
+            background: #f1f5f9; padding: 4px 10px; border-radius: 12px; border: 1.5px solid #cbd5e1;
+            transition: all 0.2s;
+        }
+        .modal-sub:hover { background: #e2e8f0; border-color: #94a3b8; transform: scale(1.05); }
+        .ig-handle { color: #e11d48; }
 
         .doodle-input{width:100%;padding:12px 16px;border:3px solid #cbd5e1;border-radius:14px;
             font-family:'Patrick Hand',cursive;font-size:1.2rem;text-align:center;outline:none;background:#f8fafc;transition:all .2s;}
@@ -198,7 +219,11 @@
     <div id="overlay">
         <div class="modal">
             <h1>DOODLE <span>MMO</span></h1>
-            <p class="modal-sub">Ultimate V10 - Bersih!</p>
+            
+            <!-- Link Instagram Update -->
+            <a href="https://instagram.com/kryn.yon" target="_blank" class="modal-sub">
+                A game by <span class="ig-handle">@kryn.yon</span>
+            </a>
 
             <input type="text" class="doodle-input" id="nameInput" placeholder="Ketik Namamu..." maxlength="10">
             <div id="errMsg"></div>
@@ -257,11 +282,12 @@
 </div>
 
 <script>
-// ── CONFIG ──
+// ── CONFIG & SERVER RESET ──
+// Data di-reset menggunakan V11 untuk Public Release!
 const UPSTASH_URL   = "https://intense-calf-74085.upstash.io";
 const UPSTASH_TOKEN = "gQAAAAAAASFlAAIgcDJjODE2YjZiYjg3OWE0M2NiOTBlMTY5MzRkODBmNzU4Nw";
 const ABLY_KEY      = '4opURQ.FVPiqg:z5W8zQxWoBNlXmlAXvOv4Bz1bmn_ISnFucJGpjFijS8';
-const LB_KEY        = 'doodle_mmo_lb_v10'; // RESET LEADERBOARD TOTAL V10
+const LB_KEY        = 'doodle_mmo_lb_public_v1'; // RESET TOTAL
 const EXPIRE_MS     = 7 * 24 * 60 * 60 * 1000;
 
 // ── KOORDINAT ──
@@ -297,12 +323,16 @@ let p = {
     hasDJ: false, hasHeart: false, starCharges: 0, isFreeFalling: false,
     chatMsg: '', chatTimer: 0, idleBreath: 0, isIdle: false,
     currentPlatform: null, platOffsetX: 0, expressionTimer: 0,
-    collectedLoot: new Map() // Untuk respawn timer
+    collectedLoot: new Map() 
 };
 
 let peers = {}, platforms = new Map(), stars = new Map(), items = new Map(), particles = [];
-let camY = 0, currentMeters = 0, displayScore = 0, highScore = parseInt(localStorage.getItem('doodle_hs_m10') || '0');
+let camY = 0, currentMeters = 0, displayScore = 0;
+// Reset Local Storage Key untuk rilis baru
+let highScore = parseInt(localStorage.getItem('doodle_hs_m11') || '0'); 
 let lastSubmittedScore = 0;
+
+document.getElementById('highScoreVal').textContent = highScore + 'm';
 
 // FISIKA
 const GRAVITY = 0.55, JUMP_FORCE = -14, SPRING_FORCE = -20, TRAMPOLINE_FORCE = -25, FLY_FORCE = -20, ROCKET_FORCE = -30, BUMPER_FORCE = -17, BOOST_FORCE = -30;
@@ -310,7 +340,6 @@ let TERMINAL_V = 18; const FALL_V = 35, MOVE_SPEED = 9;
 const PLAT_GAP = 145; 
 let keys = { left: false, right: false };
 
-document.getElementById('highScoreVal').textContent = highScore + 'm';
 
 // ── UPSTASH & LEADERBOARD ──
 async function upGet(k) { try { let r = await fetch(`${UPSTASH_URL}/get/${k}`, {headers:{Authorization:`Bearer ${UPSTASH_TOKEN}`}}); let d = await r.json(); return d.result?JSON.parse(d.result):null; }catch(e){return null;} }
@@ -360,7 +389,7 @@ function connectAbly(name) {
     if (ably) { try { ably.close(); } catch(e){} }
     try {
         ably = new Ably.Realtime({ key: ABLY_KEY, clientId: myId }); 
-        chan = ably.channels.get('doodle-mmo-ultimate-v20'); // Channel fresh
+        chan = ably.channels.get('doodle-mmo-public-v1'); // Server Baru
         chan.presence.subscribe(() => { chan.presence.get((err, m) => { if(m) document.getElementById('onlineCnt').textContent = m.length; }); });
         
         chan.subscribe('sync', msg => {
@@ -400,7 +429,14 @@ function publishSync() {
 function sendChat(t) { if (!t) return; if (chan) chan.publish('chat', { t }); else { p.chatMsg = t; p.chatTimer = 160; } }
 
 setInterval(() => { publishSync(); let now = Date.now(); for (let id in peers) if (now - peers[id].lastSeen > 4000) delete peers[id]; }, 40); 
-setInterval(() => { if (gameState === 'PLAY' && currentMeters > lastSubmittedScore + 5) { lastSubmittedScore = currentMeters; lbSubmit(playerName, currentMeters); } }, 10000);
+
+// Perbaikan interval penyimpanan otomatis tiap 3 detik saat naik (Tidak lagi mengganggu nilai jatuh)
+setInterval(() => { 
+    if (gameState === 'PLAY' && currentMeters > lastSubmittedScore + 5) { 
+        lastSubmittedScore = currentMeters; 
+        lbSubmit(playerName, highScore); // Selalu simpan highscore lokal
+    } 
+}, 3000);
 
 
 // ── MAP GEN (SAFE MARGIN 10PX & SUPER RARE LIFT) ──
@@ -703,9 +739,11 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
     
     let eox = (facing === 'right') ? 5 : (facing === 'left') ? -5 : 0;
     
-    // Teks Nama
+    // Perbaikan Bug Nama Tag: Sesuaikan Y Offset berdasarkan jenis karakter
+    let nameYOffset = (charType === 'doodle') ? 52 : (charType === 'slime' ? 45 : 40);
+
     ctx.save();
-    ctx.translate(cx, cy - 40 - (charType === 'slime' ? 5 : 0));
+    ctx.translate(cx, cy - nameYOffset);
     ctx.font = `900 14px 'Nunito',sans-serif`; ctx.textAlign='center';
     ctx.strokeStyle='white'; ctx.lineWidth=3.5; ctx.strokeText(name, 0, 0);
     ctx.fillStyle='#1e293b'; ctx.fillText(name, 0, 0);
@@ -853,9 +891,28 @@ function triggerJump() {
     }
 }
 
+// Efek Screen Shake
+function triggerScreenShake() {
+    const gc = document.getElementById('gameContainer');
+    gc.classList.remove('shake-effect');
+    void gc.offsetWidth; // trigger reflow
+    gc.classList.add('shake-effect');
+}
+
 function loop() {
     requestAnimationFrame(loop); ctx.clearRect(0,0,W,H);
     if (gameState === 'MENU') return;
+
+    // ── FITUR KEJUTAN: UPDATE WARNA LANGIT BERDASARKAN KETINGGIAN ──
+    let heightRatio = Math.min(1, currentMeters / 1000); // Gelap maksimal di 1000m
+    let r1 = Math.floor(224 - (224 - 15) * heightRatio); 
+    let g1 = Math.floor(231 - (231 - 23) * heightRatio);
+    let b1 = Math.floor(255 - (255 - 42) * heightRatio);
+    let r2 = Math.floor(248 - (248 - 30) * heightRatio); 
+    let g2 = Math.floor(250 - (250 - 27) * heightRatio);
+    let b2 = Math.floor(252 - (252 - 75) * heightRatio);
+    document.getElementById('gameContainer').style.background = `linear-gradient(180deg, rgb(${r1},${g1},${b1}) 0%, rgb(${r2},${g2},${b2}) 100%)`;
+
 
     p.oldY = p.y; p.expressionTimer++; 
     if (p.chatTimer > 0) p.chatTimer--;
@@ -876,7 +933,8 @@ function loop() {
     // ── METER COUNTDOWN ──
     currentMeters = Math.max(0, Math.floor((GROUND_Y - p.y) / 50));
     if (gameState === 'PLAY' && currentMeters > highScore) { 
-        highScore = currentMeters; document.getElementById('highScoreVal').textContent = highScore + 'm'; localStorage.setItem('doodle_hs_m10', highScore); 
+        highScore = currentMeters; document.getElementById('highScoreVal').textContent = highScore + 'm'; 
+        localStorage.setItem('doodle_hs_m11', highScore); // Save ke versi 11
     }
     
     if (displayScore < currentMeters) displayScore = currentMeters; 
@@ -928,16 +986,20 @@ function loop() {
         if (p.isIdle) {
             p.vx = 0; p.vy = 0; 
             
-            // Conveyor push & EDGE DETECT: Jatuh jika melewati batas platform (Bug Fix)
+            // Conveyor push & EDGE BUG FIX: Jatuh dengan lebih presisi
             if (p.currentPlatform) {
                 let pl = p.currentPlatform;
                 if (pl.type === 'conveyor') {
                     p.x += pl.dir * 2.5;
                     p.platOffsetX = p.x - pl.x;
                 }
-                // Jika posisi X meleset dari platform, jatuh!
-                if (p.x < pl.x - 10 || p.x > pl.x + pl.w + 10) {
+                
+                // Margin dikurangi dari 10px ke 4px supaya tidak glitch di udara
+                if (p.x < pl.x - 4 || p.x > pl.x + pl.w + 4) {
                     p.isIdle = false; p.currentPlatform = null;
+                    // Normalkan bentuk perlahan
+                    p.scaleX += (1 - p.scaleX) * 0.5;
+                    p.scaleY += (1 - p.scaleY) * 0.5;
                 }
             }
 
@@ -947,8 +1009,10 @@ function loop() {
                 if (p.starCharges > 0) { p.starCharges--; spawnParticles(p.x, p.y, '#fbbf24', 25); floatText(p.x, p.y, 'SUPER JUMP!', '#f59e0b'); }
                 p.vy = f; spawnParticles(p.x, p.y, '#e2e8f0', 5); 
                 
-                if (playerType === 'jelly') { p.scaleX = 0.6; p.scaleY = 1.3; }
-                else if (playerType === 'slime') { p.scaleX = 0.7; p.scaleY = 1.2; }
+                // Polishing Animasi Lompat
+                if (playerType === 'jelly') { p.scaleX = 0.5; p.scaleY = 1.5; }
+                else if (playerType === 'slime') { p.scaleX = 0.7; p.scaleY = 1.3; }
+                else { p.scaleX = 0.8; p.scaleY = 1.2; }
             }
         } else {
             if (keys.left) { targetVx = -MOVE_SPEED; p.facing = 'left'; }
@@ -965,8 +1029,11 @@ function loop() {
     let targetSx = 1, targetSy = 1;
     if (p.isIdle) {
         p.idleBreath += 0.1;
-        targetSx = 1 + Math.sin(p.idleBreath) * 0.04;
-        targetSy = 1 - Math.sin(p.idleBreath) * 0.03;
+        // Napas berbeda tiap karakter
+        let breathAmpX = (playerType==='jelly')?0.08:(playerType==='slime')?0.06:0.03;
+        let breathAmpY = (playerType==='jelly')?0.06:(playerType==='slime')?0.04:0.02;
+        targetSx = 1 + Math.sin(p.idleBreath) * breathAmpX;
+        targetSy = 1 - Math.sin(p.idleBreath) * breathAmpY;
     } else if (p.vy !== 0 && !activeLift) {
         if (p.vy < -5) { targetSy = 1.15; targetSx = 0.88; } 
         else if (p.vy > 5) { targetSy = 1.05; targetSx = 0.95; }
@@ -993,18 +1060,20 @@ function loop() {
         if (p.isFreeFalling) {
             p.vy = 0; p.vx = 0; p.isFreeFalling = false;
             
-            // Squash drastis SEKALI saja saat impact
+            // Squash drastis SEKALI saja saat impact keras
             if (playerType === 'jelly') { p.scaleX = 2.5; p.scaleY = 0.15; } 
-            else if (playerType === 'slime') { p.scaleX = 1.8; p.scaleY = 0.3; } 
+            else if (playerType === 'slime') { p.scaleX = 2.0; p.scaleY = 0.3; } 
             else { p.scaleX = 1.6; p.scaleY = 0.4; }
 
             spawnParticles(p.x, GROUND_Y, '#ef4444', 40);
+            triggerScreenShake(); // Efek Gempa
             
             p.chatMsg = 'Aduh... Ayo naik!'; p.chatTimer = 120; 
             p.hurtTimer = 30; // Mata merem cuma 1 detik (30 frame)
             if (chan) chan.publish('chat', {t: 'Aduh... Ayo naik!'});
             
-            lbSubmit(playerName, Math.max(0, currentMeters)); 
+            // LAKUKAN SUBMIT SKOR SAAT JATUH (FIX LEADERBOARD BUG)
+            lbSubmit(playerName, highScore); 
             
             p.isIdle = true; p.hasDJ = true; p.currentPlatform = null;
         } else if (p.vy > 0) {
@@ -1039,7 +1108,7 @@ function loop() {
                 s.update(); s.draw();
                 if (p.flyTimer<=0 && p.rocketTimer<=0 && Math.abs(p.x-s.x)<35 && p.y>s.y-35 && p.y<s.y+22) { 
                     p.collectedLoot.set(s.id, Date.now()); 
-                    p.starCharges = 1; // FIX: Lock ke 1, anti tumpuk!
+                    p.starCharges = 1; 
                     spawnParticles(s.x, s.y, '#fbbf24', 15); floatText(s.x, s.y, 'BINTANG AKTIF!', '#f59e0b'); 
                 }
             }
@@ -1085,14 +1154,15 @@ function loop() {
 
                 if (!keys.left && !keys.right && pl.type !== 'icy') { 
                     p.isIdle=true; p.currentPlatform=pl; p.idleBreath=0; p.platOffsetX = p.x - pl.x; 
-                    if (playerType === 'jelly') { p.scaleX = 1.9; p.scaleY = 0.3; } 
-                    else if (playerType === 'slime') { p.scaleX = 1.6; p.scaleY = 0.4; } 
+                    // Pijakan normal (Polished Animation)
+                    if (playerType === 'jelly') { p.scaleX = 2.1; p.scaleY = 0.25; } 
+                    else if (playerType === 'slime') { p.scaleX = 1.7; p.scaleY = 0.4; } 
                     else { p.scaleX = 1.4; p.scaleY = 0.6; }
                 } else { 
                     p.vy=JUMP_FORCE; p.currentPlatform=pl; 
-                    if (playerType === 'jelly') { p.scaleX = 0.7; p.scaleY = 1.2; } 
-                    else if (playerType === 'slime') { p.scaleX = 0.8; p.scaleY = 1.1; } 
-                    else { p.scaleX = 1.2; p.scaleY = 0.8; }
+                    if (playerType === 'jelly') { p.scaleX = 0.6; p.scaleY = 1.4; } 
+                    else if (playerType === 'slime') { p.scaleX = 0.8; p.scaleY = 1.2; } 
+                    else { p.scaleX = 0.9; p.scaleY = 1.1; }
                 }
                 spawnParticles(p.x, p.y+5, '#e2e8f0', 5); break;
             }
@@ -1117,7 +1187,6 @@ function loop() {
     for (let id in peers) {
         let op = peers[id]; 
         
-        // FIX: Turunkan Timer Chat Player Lain
         if (op.chatTimer > 0) op.chatTimer--;
 
         let buf = op.buffer;
@@ -1133,13 +1202,11 @@ function loop() {
             targetSx = s0.sx + (s1.sx - s0.sx) * ratio; targetSy = s0.sy + (s1.sy - s0.sy) * ratio;
             refState = s0; 
         } else {
-            // Prediksi Dead Reckoning jika paket delay
             if (op.x === undefined) { op.x = refState.x; op.y = refState.y; }
             targetX = refState.x; targetY = refState.y;
             targetSx = refState.sx; targetSy = refState.sy;
         }
         
-        // Muluskan pergerakan akhir
         op.x += (targetX - op.x) * 0.3; op.y += (targetY - op.y) * 0.3;
 
         drawCharacter(op.x, op.y, refState.c||'#f8fafc', targetSx||1, targetSy||1, refState.n, refState.f||'right', refState.fly?30:0, refState.rocket?30:0, refState.dj?30:0, refState.bl?30:0, false, op.chatMsg||'', op.chatTimer||0, 90, refState.fl, refState.ct||'doodle', refState.ht);
@@ -1163,13 +1230,13 @@ document.getElementById('startBtn').onclick = () => {
     if (!name) { err.textContent = 'Masukkan nama dulu!'; return; } if (name.length < 2) { err.textContent = 'Minimal 2 huruf!'; return; }
     
     playerName = name;
-    localStorage.setItem('doodle_n10', playerName); localStorage.setItem('doodle_c10', playerColor); localStorage.setItem('doodle_t10', playerType);
+    localStorage.setItem('doodle_n11', playerName); localStorage.setItem('doodle_c11', playerColor); localStorage.setItem('doodle_t11', playerType);
 
     document.getElementById('overlay').style.display = 'none'; document.getElementById('scoreHud').style.display = 'flex'; document.getElementById('onlinePill').style.display = 'flex'; document.getElementById('chatFab').style.display = 'block'; document.getElementById('touchZone').style.display = 'block';
     connectAbly(name); resetGame(); lbFetch();
 };
 
-let savedName = localStorage.getItem('doodle_n10'); let savedColor = localStorage.getItem('doodle_c10'); let savedType = localStorage.getItem('doodle_t10');
+let savedName = localStorage.getItem('doodle_n11'); let savedColor = localStorage.getItem('doodle_c11'); let savedType = localStorage.getItem('doodle_t11');
 if (savedName) document.getElementById('nameInput').value = savedName;
 if (savedColor) { playerColor = savedColor; document.querySelectorAll('#colorRow .color-dot').forEach(btn => { btn.classList.remove('selected'); if (btn.dataset.c === savedColor) btn.classList.add('selected'); }); }
 if (savedType) { playerType = savedType; document.querySelectorAll('.char-sel').forEach(btn => { btn.classList.remove('selected'); if (btn.dataset.t === savedType) btn.classList.add('selected'); }); }
