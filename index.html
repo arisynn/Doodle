@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -230,6 +231,8 @@
                 <div class="color-dot char-sel selected" data-t="doodle" style="background:#e2e8f0; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b;">D</div>
                 <div class="color-dot char-sel" data-t="jelly" style="background:#fbcfe8; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b; border-radius:10px;">J</div>
                 <div class="color-dot char-sel" data-t="slime" style="background:#bbf7d0; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b; border-radius: 50% 50% 10px 10px;">S</div>
+                <div class="color-dot char-sel" data-t="ninja" style="background:#cbd5e1; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b; border-radius:4px;">N</div>
+                <div class="color-dot char-sel" data-t="robot" style="background:#94a3b8; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b; border-radius:2px;">R</div>
             </div>
 
             <p class="cat-title">Warna</p>
@@ -511,6 +514,7 @@ class Platform {
         this.broken = false; this.fallVy = 0; this.restoreTimer = 0; this.bounceAnim = 0; this.startY = data.y;
         this.isSolid = true; this.opacity = 1;
         this.tilt = 0; // Untuk jungkat jungkit platform es
+        this.isCracking = false; this.crackTimer = 0; // Timer retak platform kayu
     }
     getX() { 
         if (this.type === 'moving') {
@@ -527,9 +531,21 @@ class Platform {
             this.isSolid = this.opacity > 0.4;
         }
         if (this.type === 'moving') this.x = this.getX();
-        if (this.type === 'fragile' && this.broken) {
-            this.fallVy += GRAVITY; this.y += this.fallVy; this.restoreTimer--;
-            if (this.restoreTimer <= 0) { this.broken = false; this.y = this.startY; this.fallVy = 0; spawnParticles(this.x + this.w/2, this.y, '#fff', 8); }
+        if (this.type === 'fragile') {
+            if (this.isCracking && !this.broken) {
+                this.crackTimer--;
+                if (this.crackTimer <= 0) {
+                    this.broken = true; this.fallVy = 0; this.restoreTimer = 150;
+                    spawnParticles(this.x + this.w/2, this.y, '#f59e0b', 15);
+                }
+            }
+            if (this.broken) {
+                this.fallVy += GRAVITY; this.y += this.fallVy; this.restoreTimer--;
+                if (this.restoreTimer <= 0) { 
+                    this.broken = false; this.isCracking = false; this.y = this.startY; this.fallVy = 0; 
+                    spawnParticles(this.x + this.w/2, this.y, '#fff', 8); 
+                }
+            }
         }
         // PLATFORM NAIK TURUN
         if (this.type === 'updown') {
@@ -570,10 +586,19 @@ class Platform {
             ctx.lineWidth = 3; ctx.strokeStyle = '#b45309'; let coils = Math.max(3, Math.floor(this.w / 15));
             for (let i=0;i<coils;i++) { let xp=cx+5+i*(this.w-10)/coils; ctx.beginPath(); ctx.moveTo(xp,cy-4); ctx.lineTo(xp,cy-10); ctx.stroke(); }
         } else if (this.type === 'fragile') { 
+            let shakeX = (this.isCracking && !this.broken) ? (Math.random()-0.5)*4 : 0;
+            let shakeY = (this.isCracking && !this.broken) ? (Math.random()-0.5)*4 : 0;
+            cx += shakeX; cy += shakeY;
+
             ctx.fillStyle = '#d97706'; ctx.beginPath(); ctx.roundRect(cx, cy-5, this.w, 10, 3); ctx.fill(); ctx.stroke();
             ctx.lineWidth = 2; ctx.strokeStyle = '#78350f'; 
             ctx.beginPath(); ctx.moveTo(cx+this.w/2, cy-5); ctx.lineTo(cx+this.w/2-4, cy); ctx.lineTo(cx+this.w/2+2, cy+5); ctx.stroke();
             if (!this.broken) { ctx.strokeStyle = '#fcd34d'; for (let i=8;i<this.w-4;i+=14) { ctx.beginPath(); ctx.moveTo(cx+i,cy-3); ctx.lineTo(cx+i+5,cy+3); ctx.stroke(); } }
+            if (this.isCracking && !this.broken) {
+                ctx.strokeStyle = '#451a03'; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.moveTo(cx+10, cy-5); ctx.lineTo(cx+15, cy); ctx.lineTo(cx+12, cy+5); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cx+this.w-10, cy-5); ctx.lineTo(cx+this.w-15, cy); ctx.lineTo(cx+this.w-12, cy+5); ctx.stroke();
+            }
         } else if (this.type === 'moving') { 
             ctx.fillStyle = '#3b82f6'; ctx.beginPath(); ctx.roundRect(cx, cy-5, this.w, 10, 5); ctx.fill(); ctx.stroke();
             ctx.fillStyle = '#93c5fd'; ctx.beginPath(); ctx.roundRect(cx+5, cy-2, this.w-10, 4, 2); ctx.fill();
@@ -725,12 +750,12 @@ function resetGame() {
 }
 
 // ── CHARACTER DRAWING ENGINE (SMOOTH NO GEPENG) ──
-function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT, blT, isLocal, chatMsg, chatTimer, expresT, isFalling, charType, isHurtExternal) {
+function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT, blT, chatMsg, chatTimer, expresT, isFalling, charType, isHurt, vy) {
     ctx.save();
     
     let eox = (facing === 'right') ? 5 : (facing === 'left') ? -5 : 0;
     
-    let nameYOffset = (charType === 'doodle') ? 52 : (charType === 'slime' ? 45 : 40);
+    let nameYOffset = (charType === 'doodle') ? 52 : (charType === 'slime' ? 45 : (charType === 'robot' ? 58 : 40));
 
     ctx.save();
     ctx.translate(cx, cy - nameYOffset);
@@ -775,8 +800,7 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
         ctx.beginPath(); ctx.ellipse(14, -8, 12, 5, (20-flap)*Math.PI/180, 0, Math.PI*2); ctx.fill(); ctx.stroke();
     }
 
-    let isHurt = isLocal ? (p.hurtTimer > 0) : isHurtExternal; 
-    let isBlinking = (expresT % 180 < 8), isExcited = (p.vy < -8 || rocketT > 0 || flyT > 0 || djT > 0);
+    let isBlinking = (expresT % 180 < 8), isExcited = (vy < -8 || rocketT > 0 || flyT > 0 || djT > 0);
     ctx.lineWidth=3; ctx.lineJoin='round'; ctx.strokeStyle=INK;
 
     if (charType === 'jelly') { 
@@ -826,6 +850,54 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
             ctx.beginPath(); ctx.moveTo(-3+eox, -h*.2); ctx.lineTo(3+eox, -h*.2); ctx.stroke();
         }
     } 
+    else if (charType === 'ninja') {
+        w = 30; h = 40;
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.roundRect(-w/2, -h, w, h, 6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.fillRect(-w/2, -h*.75, w, 8); ctx.strokeRect(-w/2, -h*.75, w, 8);
+        ctx.beginPath(); ctx.moveTo(-w/2, -h*.6); ctx.lineTo(-w/2 - 12, -h*.4); ctx.lineTo(-w/2 - 6, -h*.7); ctx.fill(); ctx.stroke();
+        
+        ctx.fillStyle=INK;
+        if (isHurt) {
+            ctx.beginPath(); ctx.moveTo(-6+eox, -h*.5); ctx.lineTo(-2+eox, -h*.45); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(6+eox, -h*.5); ctx.lineTo(2+eox, -h*.45); ctx.stroke();
+        } else if (isExcited) {
+            ctx.beginPath(); ctx.moveTo(-7+eox, -h*.5); ctx.lineTo(-3+eox, -h*.6); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(7+eox, -h*.5); ctx.lineTo(3+eox, -h*.6); ctx.stroke();
+        } else if (isFalling) {
+            ctx.beginPath(); ctx.arc(-5+eox, -h*.5, 3, 0, Math.PI*2); ctx.arc(5+eox, -h*.5, 3, 0, Math.PI*2); ctx.fill();
+        } else if (isBlinking) {
+            ctx.beginPath(); ctx.moveTo(-7+eox, -h*.55); ctx.lineTo(-3+eox, -h*.55); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(7+eox, -h*.55); ctx.lineTo(3+eox, -h*.55); ctx.stroke();
+        } else {
+            ctx.beginPath(); ctx.arc(-5+eox, -h*.55, 2.5, 0, Math.PI*2); ctx.arc(5+eox, -h*.55, 2.5, 0, Math.PI*2); ctx.fill();
+        }
+    }
+    else if (charType === 'robot') {
+        w = 36; h = 38;
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.rect(-w/2, -h, w, h); ctx.fill(); ctx.stroke(); 
+        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, -h-10); ctx.stroke();
+        ctx.fillStyle = isExcited ? '#ef4444' : '#3b82f6';
+        ctx.beginPath(); ctx.arc(0, -h-12, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath(); ctx.roundRect(-w/2 + 4, -h + 6, w - 8, 16, 2); ctx.fill();
+        ctx.fillStyle = '#06b6d4'; ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 2.5;
+        if (isHurt) {
+            ctx.beginPath(); ctx.moveTo(-8+eox, -h+11); ctx.lineTo(-4+eox, -h+15); ctx.moveTo(-4+eox, -h+11); ctx.lineTo(-8+eox, -h+15); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(8+eox, -h+11); ctx.lineTo(4+eox, -h+15); ctx.moveTo(4+eox, -h+11); ctx.lineTo(8+eox, -h+15); ctx.stroke();
+        } else if (isExcited) {
+            ctx.beginPath(); ctx.moveTo(-8+eox, -h+15); ctx.lineTo(-4+eox, -h+11); ctx.lineTo(0+eox, -h+15); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(8+eox, -h+15); ctx.lineTo(4+eox, -h+11); ctx.lineTo(0+eox, -h+15); ctx.stroke();
+        } else if (isFalling) {
+            ctx.beginPath(); ctx.arc(-5+eox, -h+13, 2, 0, Math.PI*2); ctx.arc(5+eox, -h+13, 2, 0, Math.PI*2); ctx.fill();
+        } else if (isBlinking) {
+            ctx.fillRect(-8+eox, -h+12, 6, 2); ctx.fillRect(2+eox, -h+12, 6, 2);
+        } else {
+            ctx.fillRect(-7+eox, -h+10, 4, 6); ctx.fillRect(3+eox, -h+10, 4, 6);
+        }
+    }
     else { 
         w = 32; h = 42;
         let grad = ctx.createRadialGradient(-w*.15, -h*.6, 3, 0, -h/2, w);
@@ -873,7 +945,20 @@ function updateLiveTopUI() {
 }
 
 function triggerJump() {
-    if (gameState === 'PLAY' && p.djTimer > 0 && p.hasDJ && !p.isFreeFalling) {
+    if (gameState !== 'PLAY') return;
+    if (p.isIdle && p.currentPlatform) {
+        p.isIdle = false;
+        let pl = p.currentPlatform;
+        p.currentPlatform = null;
+        let f = p.starCharges > 0 ? BOOST_FORCE : JUMP_FORCE;
+        if (p.starCharges > 0) { p.starCharges--; spawnParticles(p.x, p.y, '#fbbf24', 25); floatText(p.x, p.y, 'SUPER JUMP!', '#f59e0b'); }
+        p.vy = f;
+        p.hasDJ = true;
+        if (pl && pl.type === 'fragile') {
+            pl.broken = true; pl.isCracking = false; pl.restoreTimer = 150;
+            spawnParticles(pl.x + pl.w/2, pl.y, '#f59e0b', 15);
+        }
+    } else if (p.djTimer > 0 && p.hasDJ && !p.isFreeFalling) {
         p.vy = JUMP_FORCE;
         p.hasDJ = false; 
         spawnParticles(p.x, p.y + 10, '#3b82f6', 20);
@@ -973,25 +1058,26 @@ function loop() {
                 p.y = pl.y; // Ikut naik turun
             }
             if (pl.type === 'fragile' && pl.broken) {
-                p.y = pl.y; // Ikut jatuh dengan kayunya
+                p.isIdle = false; p.currentPlatform = null; // Jatuh karena kayunya hancur
             }
             
             // Jatuh jika melewati batas ujung platform
-            if (p.x < pl.x || p.x > pl.x + pl.w) {
+            if (p.currentPlatform && (p.x < pl.x || p.x > pl.x + pl.w)) {
                 p.isIdle = false; p.currentPlatform = null;
             }
         }
 
         if (p.isIdle && (keys.left || keys.right)) { 
             p.isIdle = false; 
-            if (p.currentPlatform && p.currentPlatform.type === 'fragile') {
-                p.currentPlatform = null; 
-                // Karakter dibiarkan jatuh, jangan lompat dari kayu hancur
-            } else {
-                p.currentPlatform = null; 
-                let f = p.starCharges > 0 ? BOOST_FORCE : JUMP_FORCE;
-                if (p.starCharges > 0) { p.starCharges--; spawnParticles(p.x, p.y, '#fbbf24', 25); floatText(p.x, p.y, 'SUPER JUMP!', '#f59e0b'); }
-                p.vy = f;
+            let pl = p.currentPlatform;
+            p.currentPlatform = null; 
+            let f = p.starCharges > 0 ? BOOST_FORCE : JUMP_FORCE;
+            if (p.starCharges > 0) { p.starCharges--; spawnParticles(p.x, p.y, '#fbbf24', 25); floatText(p.x, p.y, 'SUPER JUMP!', '#f59e0b'); }
+            p.vy = f;
+
+            if (pl && pl.type === 'fragile') {
+                pl.broken = true; pl.isCracking = false; pl.restoreTimer = 150;
+                spawnParticles(pl.x + pl.w/2, pl.y, '#f59e0b', 15);
             }
         }
     } else {
@@ -1118,7 +1204,16 @@ function loop() {
 
                 if (pl.type==='portal') { spawnParticles(p.x, p.y, '#a855f7', 20); p.y -= 1000; camY -= 1000; p.vy = JUMP_FORCE; break; }
                 if (pl.type==='bumper') { p.vy = BUMPER_FORCE; p.vx = (p.x < rx+pl.w/2) ? -16 : 16; spawnParticles(p.x,p.y,'#f0abfc',12); pl.bounceAnim=15; break; }
-                if (pl.type==='fragile') { pl.broken=true; pl.restoreTimer=150; spawnParticles(rx+pl.w/2,pl.y,'#f59e0b',15); p.isIdle=true; p.currentPlatform=pl; p.idleBreath=0; p.platOffsetX=p.x-pl.x; p.vy=0; break; }
+                if (pl.type==='fragile') {
+                    if (!pl.isCracking) { pl.isCracking = true; pl.crackTimer = 45; } // Retak dalam ~0.75 detik
+                    if (!keys.left && !keys.right) {
+                        p.isIdle=true; p.currentPlatform=pl; p.idleBreath=0; p.platOffsetX=p.x-pl.x; p.vy=0;
+                    } else {
+                        p.vy=JUMP_FORCE; pl.broken=true; pl.isCracking=false; pl.restoreTimer=150;
+                        spawnParticles(rx+pl.w/2, pl.y, '#f59e0b', 15);
+                    }
+                    break; 
+                }
                 if (pl.type==='spring') { p.vy=SPRING_FORCE; pl.bounceAnim=15; spawnParticles(p.x,p.y,'#fde047',8); break; }
                 if (pl.type==='trampoline') { p.vy=TRAMPOLINE_FORCE; pl.bounceAnim=15; spawnParticles(p.x,p.y,'#fca5a5',10); break; }
                 
@@ -1173,11 +1268,11 @@ function loop() {
         op.x += (targetX - op.x) * 0.3; op.y += (targetY - op.y) * 0.3;
 
         let peerExprT = Math.floor(Date.now() / 16) + (id.charCodeAt(id.length-1) * 33);
-        drawCharacter(op.x, op.y, refState.c||'#f8fafc', targetSx||1, targetSy||1, refState.n, refState.f||'right', refState.fly?30:0, refState.rocket?30:0, refState.dj?30:0, refState.bl?30:0, false, op.chatMsg||'', op.chatTimer||0, peerExprT, refState.fl, refState.ct||'doodle', refState.ht);
+        drawCharacter(op.x, op.y, refState.c||'#f8fafc', targetSx||1, targetSy||1, refState.n, refState.f||'right', refState.fly?30:0, refState.rocket?30:0, refState.dj?30:0, refState.bl?30:0, op.chatMsg||'', op.chatTimer||0, peerExprT, refState.fl, refState.ct||'doodle', refState.ht, refState.vy||0);
     }
     
     let isFallingLocal = p.isFreeFalling || p.vy > 8;
-    drawCharacter(p.x, p.y, playerColor, p.scaleX, p.scaleY, playerName, p.facing, p.flyTimer, p.rocketTimer, p.djTimer, p.balloonTimer, true, p.chatMsg, p.chatTimer, p.expressionTimer, isFallingLocal, playerType, false);
+    drawCharacter(p.x, p.y, playerColor, p.scaleX, p.scaleY, playerName, p.facing, p.flyTimer, p.rocketTimer, p.djTimer, p.balloonTimer, p.chatMsg, p.chatTimer, p.expressionTimer, isFallingLocal, playerType, p.hurtTimer > 0, p.vy);
     
     ctx.restore(); 
 }
