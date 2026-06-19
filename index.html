@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -230,8 +231,6 @@
                 <div class="color-dot char-sel selected" data-t="doodle" style="background:#e2e8f0; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b;">D</div>
                 <div class="color-dot char-sel" data-t="jelly" style="background:#fbcfe8; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b; border-radius:10px;">J</div>
                 <div class="color-dot char-sel" data-t="slime" style="background:#bbf7d0; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b; border-radius: 50% 50% 10px 10px;">S</div>
-                <div class="color-dot char-sel" data-t="ninja" style="background:#cbd5e1; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b; border-radius:4px;">N</div>
-                <div class="color-dot char-sel" data-t="robot" style="background:#94a3b8; font-family:'Nunito'; font-size:14px; display:flex; align-items:center; justify-content:center; font-weight:900; color:#1e293b; border-radius:2px;">R</div>
             </div>
 
             <p class="cat-title">Warna</p>
@@ -481,6 +480,23 @@ function generateLevel(lvl) {
         let prevD = getLevelData(lvl - 1);
         if (['fragile', 'ghost', 'portal'].includes(prevD.type) && ['fragile', 'ghost', 'portal'].includes(type)) {
             type = d.rng() > 0.5 ? 'normal' : 'moving';
+        }
+    }
+
+    // 🔥 RULE KHUSUS: Disable "ghost" di dekat "updown"
+    if (type === 'ghost') {
+        let isNextUpdown = false;
+        let nextD = getLevelData(lvl + 1);
+        if (nextD.type === 'updown') isNextUpdown = true;
+
+        let isPrevUpdown = false;
+        if (lvl > 3) {
+            let pastD = getLevelData(lvl - 3);
+            if (pastD.type === 'updown') isPrevUpdown = true;
+        }
+
+        if (isNextUpdown || isPrevUpdown) {
+            type = 'normal'; 
         }
     }
 
@@ -751,7 +767,8 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
     
     let eox = (facing === 'right') ? 5 : (facing === 'left') ? -5 : 0;
     
-    let nameYOffset = (charType === 'doodle') ? 52 : (charType === 'slime' ? 45 : (charType === 'robot' ? 58 : 40));
+    // Y Offset Disesuaikan karena robot/ninja dihapus
+    let nameYOffset = (charType === 'doodle') ? 52 : (charType === 'slime' ? 45 : 40);
 
     ctx.save();
     ctx.translate(cx, cy - nameYOffset);
@@ -846,54 +863,6 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
             ctx.beginPath(); ctx.moveTo(-3+eox, -h*.2); ctx.lineTo(3+eox, -h*.2); ctx.stroke();
         }
     } 
-    else if (charType === 'ninja') {
-        w = 30; h = 40;
-        ctx.fillStyle = color;
-        ctx.beginPath(); ctx.roundRect(-w/2, -h, w, h, 6); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath(); ctx.fillRect(-w/2, -h*.75, w, 8); ctx.strokeRect(-w/2, -h*.75, w, 8);
-        ctx.beginPath(); ctx.moveTo(-w/2, -h*.6); ctx.lineTo(-w/2 - 12, -h*.4); ctx.lineTo(-w/2 - 6, -h*.7); ctx.fill(); ctx.stroke();
-        
-        ctx.fillStyle=INK;
-        if (isHurt) {
-            ctx.beginPath(); ctx.moveTo(-6+eox, -h*.5); ctx.lineTo(-2+eox, -h*.45); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(6+eox, -h*.5); ctx.lineTo(2+eox, -h*.45); ctx.stroke();
-        } else if (isExcited) {
-            ctx.beginPath(); ctx.moveTo(-7+eox, -h*.5); ctx.lineTo(-3+eox, -h*.6); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(7+eox, -h*.5); ctx.lineTo(3+eox, -h*.6); ctx.stroke();
-        } else if (isFalling) {
-            ctx.beginPath(); ctx.arc(-5+eox, -h*.5, 3, 0, Math.PI*2); ctx.arc(5+eox, -h*.5, 3, 0, Math.PI*2); ctx.fill();
-        } else if (isBlinking) {
-            ctx.beginPath(); ctx.moveTo(-7+eox, -h*.55); ctx.lineTo(-3+eox, -h*.55); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(7+eox, -h*.55); ctx.lineTo(3+eox, -h*.55); ctx.stroke();
-        } else {
-            ctx.beginPath(); ctx.arc(-5+eox, -h*.55, 2.5, 0, Math.PI*2); ctx.arc(5+eox, -h*.55, 2.5, 0, Math.PI*2); ctx.fill();
-        }
-    }
-    else if (charType === 'robot') {
-        w = 36; h = 38;
-        ctx.fillStyle = color;
-        ctx.beginPath(); ctx.rect(-w/2, -h, w, h); ctx.fill(); ctx.stroke(); 
-        ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(0, -h-10); ctx.stroke();
-        ctx.fillStyle = isExcited ? '#ef4444' : '#3b82f6';
-        ctx.beginPath(); ctx.arc(0, -h-12, 4, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath(); ctx.roundRect(-w/2 + 4, -h + 6, w - 8, 16, 2); ctx.fill();
-        ctx.fillStyle = '#06b6d4'; ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 2.5;
-        if (isHurt) {
-            ctx.beginPath(); ctx.moveTo(-8+eox, -h+11); ctx.lineTo(-4+eox, -h+15); ctx.moveTo(-4+eox, -h+11); ctx.lineTo(-8+eox, -h+15); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(8+eox, -h+11); ctx.lineTo(4+eox, -h+15); ctx.moveTo(4+eox, -h+11); ctx.lineTo(8+eox, -h+15); ctx.stroke();
-        } else if (isExcited) {
-            ctx.beginPath(); ctx.moveTo(-8+eox, -h+15); ctx.lineTo(-4+eox, -h+11); ctx.lineTo(0+eox, -h+15); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(8+eox, -h+15); ctx.lineTo(4+eox, -h+11); ctx.lineTo(0+eox, -h+15); ctx.stroke();
-        } else if (isFalling) {
-            ctx.beginPath(); ctx.arc(-5+eox, -h+13, 2, 0, Math.PI*2); ctx.arc(5+eox, -h+13, 2, 0, Math.PI*2); ctx.fill();
-        } else if (isBlinking) {
-            ctx.fillRect(-8+eox, -h+12, 6, 2); ctx.fillRect(2+eox, -h+12, 6, 2);
-        } else {
-            ctx.fillRect(-7+eox, -h+10, 4, 6); ctx.fillRect(3+eox, -h+10, 4, 6);
-        }
-    }
     else { 
         w = 32; h = 42;
         let grad = ctx.createRadialGradient(-w*.15, -h*.6, 3, 0, -h/2, w);
