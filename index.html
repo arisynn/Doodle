@@ -17,7 +17,7 @@
             position:relative; width:100%; height:100%; max-width:460px;
             background: linear-gradient(180deg, #e0e7ff 0%, #f8fafc 100%);
             overflow:hidden; box-shadow:0 0 40px rgba(0,0,0,0.6);
-            transition: background 1.5s ease; /* Transisi Halus Bioma */
+            transition: background 0.5s ease;
         }
         @media (min-width: 480px) {
             #gameContainer { height:95vh; border-radius:24px; border:8px solid #0f172a; }
@@ -35,7 +35,7 @@
         .shake-effect { animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
 
         .bg-grid{position:absolute;inset:0;z-index:0;pointer-events:none;
-            background-image:linear-gradient(rgba(255,255,255,0.15) 1.5px,transparent 1.5px),linear-gradient(90deg,rgba(255,255,255,0.15) 1.5px,transparent 1.5px);
+            background-image:linear-gradient(rgba(255,255,255,0.1) 1.5px,transparent 1.5px),linear-gradient(90deg,rgba(255,255,255,0.1) 1.5px,transparent 1.5px);
             background-size:45px 45px;}
         .bg-grid::before{content:'';position:absolute;inset:0;
             background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,255,255,0.4), transparent 70%),radial-gradient(ellipse 60% 40% at 80% 100%, rgba(255,255,255,0.2), transparent 60%);}
@@ -72,13 +72,6 @@
         #liveTopBtn:active{background:#fde68a;}
         #liveTopContent, #lbContent{display:none;margin-top:8px;padding-top:6px;border-top:2px dashed #cbd5e1;}
         #liveTopContent.open, #lbContent.open{display:block;}
-
-        #biomeBadge {
-            font-size: 0.65rem; font-weight: 900; color: #fff; background: #64748b; 
-            padding: 2px 8px; border-radius: 8px; display: inline-block; 
-            text-transform: uppercase; letter-spacing: 1px; margin-top: 4px;
-            box-shadow: 0 2px 0 #334155; transition: background 0.3s;
-        }
 
         /* ── MODAL ── */
         #overlay{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
@@ -178,7 +171,6 @@
                         </div>
                         <svg id="liveTopArrow" class="icon-sm" style="stroke:#b45309;" viewBox="0 0 24 24" fill="none" stroke-width="3"><path d="M6 9l6 6 6-6"/></svg>
                     </div>
-                    <div id="biomeBadge">HUTAN PEMULA</div>
 
                     <!-- Heart/Nyawa Container -->
                     <div id="heartContainer" style="display:none; align-items:center; gap:6px; margin-top:4px; padding-top:6px; border-top:1.5px dashed #cbd5e1;">
@@ -264,10 +256,10 @@
             <div class="qc-grid" id="qcGrid">
                 <button class="qc-btn">Halo semua!</button>
                 <button class="qc-btn">Ayo naik!</button>
-                <button class="qc-btn">ZONA AMAN!</button>
+                <button class="qc-btn">Sabar :)</button>
                 <button class="qc-btn">AAAAAA!</button>
                 <button class="qc-btn">Makasih!</button>
-                <button class="qc-btn">Awas Jatuh!</button>
+                <button class="qc-btn">Aduh!</button>
             </div>
             <div id="chatInputRow">
                 <input type="text" id="chatTxt" placeholder="Ketik pesan..." maxlength="25">
@@ -294,9 +286,6 @@ const UPSTASH_TOKEN = "gQAAAAAAASFlAAIgcDJjODE2YjZiYjg3OWE0M2NiOTBlMTY5MzRkODBmN
 const ABLY_KEY      = '4opURQ.FVPiqg:z5W8zQxWoBNlXmlAXvOv4Bz1bmn_ISnFucJGpjFijS8';
 const LB_KEY        = 'doodle_mmo_lb_public_v2'; 
 const EXPIRE_MS     = 7 * 24 * 60 * 60 * 1000;
-
-// FASE 1.1: GLOBAL DAILY SEED (Map tersinkronisasi global, berganti tiap 24 jam)
-const DAILY_SEED    = Math.floor(Date.now() / (1000 * 60 * 60 * 24));
 
 // ── KOORDINAT ──
 const MAP_W = 420;      
@@ -399,7 +388,6 @@ function connectAbly(name) {
         chan = ably.channels.get('doodle-mmo-public-v2'); 
         chan.presence.subscribe(() => { chan.presence.get((err, m) => { if(m) document.getElementById('onlineCnt').textContent = m.length; }); });
         
-        // SYNC POSISI PEMAIN
         chan.subscribe('sync', msg => {
             if (msg.clientId === myId) return; 
             let d = msg.data, id = msg.clientId, now = Date.now();
@@ -414,18 +402,6 @@ function connectAbly(name) {
 
             if (peers[id].buffer.length > 8) peers[id].buffer.shift();
             peers[id].lastSeen = now;
-        });
-
-        // SYNC LINGKUNGAN MMO (Platform Fragile yang Hancur) FASE 1.2
-        chan.subscribe('env', msg => {
-            let d = msg.data;
-            if (d.t === 'brk' && platforms.has(d.l)) {
-                let pl = platforms.get(d.l);
-                if (pl.type === 'fragile' && !pl.broken) {
-                    pl.broken = true; pl.isCracking = false; pl.restoreTimer = 150;
-                    spawnParticles(pl.x + pl.w/2, pl.y, '#f59e0b', 15);
-                }
-            }
         });
 
         chan.subscribe('chat', msg => {
@@ -452,100 +428,83 @@ setInterval(() => { publishSync(); let now = Date.now(); for (let id in peers) i
 setInterval(() => { if (gameState === 'PLAY' && currentMeters > lastSubmittedScore + 5) { lastSubmittedScore = currentMeters; lbSubmit(playerName, highScore); } }, 3000);
 
 
-// ── MAP GEN & MMO BIOMES FASE 3 ──
+// ── MAP GEN & PLATFORMS ──
 function mulberry32(seed) { return function() { let t = seed += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-const BIOMES = [
-    { maxLvl: 40, name: "Hutan Pemula", badgeBg: '#22c55e', weights: { normal: 70, moving: 30 }, colors: [224, 231, 255, 248, 250, 252] },
-    { maxLvl: 90, name: "Pabrik Sibuk", badgeBg: '#64748b', weights: { normal: 40, moving: 30, conveyor: 20, fragile: 10 }, colors: [203, 213, 225, 241, 245, 249] },
-    { maxLvl: 140, name: "Puncak Es", badgeBg: '#38bdf8', weights: { icy: 40, normal: 20, updown: 15, fragile: 15, moving: 10 }, colors: [186, 230, 253, 240, 249, 255] },
-    { maxLvl: 190, name: "Zona Ilusi", badgeBg: '#a855f7', weights: { ghost: 30, portal: 15, bumper: 15, moving: 20, normal: 20 }, colors: [216, 180, 254, 250, 245, 255] },
-    { maxLvl: Infinity, name: "Kekacauan", badgeBg: '#ef4444', weights: { updown: 15, ghost: 15, icy: 15, bumper: 15, fragile: 15, trampoline: 15, moving: 10 }, colors: [252, 165, 165, 254, 226, 226] }
-];
-
-function getBiome(lvl) {
-    for (let b of BIOMES) if (lvl <= b.maxLvl) return b;
-    return BIOMES[BIOMES.length - 1];
-}
-
-// FASE 2.1: Weighted Loot Table untuk Platform
-function pickWeighted(weights, rngValue) {
-    let total = 0; for (let k in weights) total += weights[k];
-    let r = rngValue * total;
-    for (let k in weights) { if (r < weights[k]) return k; r -= weights[k]; }
-    return Object.keys(weights)[0];
-}
-
 function getLevelData(lvl) {
-    // Injeksi Daily Seed ke dalam RNG
-    let rng = mulberry32(lvl * 7919 + 13337 + DAILY_SEED * 99991);
+    let rng = mulberry32(lvl * 7919 + 13337);
     let r1 = rng(), r2 = rng(), r3 = rng(), r4 = rng();
     
-    // FASE 3.2: REST AREA (Zona Aman berkumpul pemain setiap 50 level)
-    if (lvl > 0 && lvl % 50 === 0) {
-        return { type: 'ground', pw: MAP_W, px: 0, rng, isRestArea: true, biomeName: "REST AREA" };
-    }
-
     let pw = 45 + r1 * 60; 
     let safeWidth = MAP_W - pw - 20;
     let px = 10 + Math.floor(r2 * safeWidth); 
     
-    let biome = getBiome(lvl);
-    let type = pickWeighted(biome.weights, r3);
+    let type = 'normal';
+    if (lvl < 10) {
+        if (r3 > 0.8) type = 'moving';
+    } else if (lvl < 40) {
+        if (r3 > 0.8) type = 'conveyor';
+        else if (r3 > 0.6) type = 'moving';
+        else if (r3 > 0.5) type = 'fragile';
+        else if (r3 > 0.93) type = 'spring'; 
+    } else { 
+        if (r3 > 0.95) type = 'updown'; // Menggantikan Lift
+        else if (r3 > 0.85) type = 'ghost';
+        else if (r3 > 0.75) type = 'icy';
+        else if (r3 > 0.6) type = 'conveyor';
+        else if (r3 > 0.45) type = 'moving';
+        else if (r3 > 0.4) type = 'fragile';
+        else if (r3 > 0.35) type = 'trampoline';
+        else if (r3 > 0.3) type = 'portal';
+        else if (r3 > 0.25) type = 'bumper';
+    }
 
-    return { type, pw, px, rng, r4, biomeName: biome.name };
+    return { type, pw, px, rng, r4 };
 }
 
 function generateLevel(lvl) {
     if (lvl === 0) return { type:'ground', x: -1500, y: GROUND_Y, w: 4000 }; 
     
-    let d = getLevelData(lvl);
-
-    // Tangani Rest Area Spawning
-    if (d.isRestArea) {
-        return { type: 'ground', x: 0, y: GROUND_Y - lvl * PLAT_GAP, w: MAP_W, item: null, hasStar: false, baseX: 0, isRestArea: true };
-    }
-
-    let type = d.type;
-
-    // FASE 2.2: Safeguard Matrix & Fallback Cerdas
-    if (type !== 'updown') {
-        for(let i=1; i<=2; i++) {
-            if (lvl - i > 0) {
-                let past = getLevelData(lvl - i);
-                if (past.type === 'updown') return null; // Jeda area di atas updown
-            }
+    // SISTEM JEDA UNTUK PLATFORM UPDOWN
+    for(let i=1; i<=2; i++) {
+        if (lvl - i > 0) {
+            let past = getLevelData(lvl - i);
+            if (past.type === 'updown') return null; // Jika 1 atau 2 level di bawah adalah updown, jangan buat platform disini
         }
-    } else {
-        // Cegah Updown berturut-turut yang mustahil dilewati
-        let past1 = lvl > 1 ? getLevelData(lvl-1).type : null;
-        let past2 = lvl > 2 ? getLevelData(lvl-2).type : null;
-        if (past1 === 'updown' || past2 === 'updown') type = 'moving';
     }
+
+    let d = getLevelData(lvl);
+    let type = d.type;
 
     if (lvl > 1) {
         let prevD = getLevelData(lvl - 1);
         if (['fragile', 'ghost', 'portal'].includes(prevD.type) && ['fragile', 'ghost', 'portal'].includes(type)) {
-            type = d.rng() > 0.5 ? 'conveyor' : 'moving'; // Fallback aman
+            type = d.rng() > 0.5 ? 'normal' : 'moving';
         }
     }
 
-    // Hindari jebakan ghost dan updown
+    // 🔥 RULE KHUSUS: Disable "ghost" di dekat "updown"
     if (type === 'ghost') {
-        let isNextUpdown = getLevelData(lvl + 1).type === 'updown';
-        let isPrevUpdown = lvl > 3 ? getLevelData(lvl - 3).type === 'updown' : false;
-        if (isNextUpdown || isPrevUpdown) type = 'moving'; 
+        let isNextUpdown = false;
+        let nextD = getLevelData(lvl + 1);
+        if (nextD.type === 'updown') isNextUpdown = true;
+
+        let isPrevUpdown = false;
+        if (lvl > 3) {
+            let pastD = getLevelData(lvl - 3);
+            if (pastD.type === 'updown') isPrevUpdown = true;
+        }
+
+        if (isNextUpdown || isPrevUpdown) {
+            type = 'normal'; 
+        }
     }
 
     let item = null, hasStar = false;
     let r_item = d.rng();
     
-    // FASE 4.1: Smart Item Placement (Risk vs Reward)
-    let isDangerous = ['fragile', 'ghost', 'bumper', 'icy'].includes(type);
-    let itemSpawnChance = isDangerous ? 0.85 : 0.95; // 15% peluang jika bahaya, 5% jika aman
-
-    if (type !== 'updown' && type !== 'portal') {
-        if (lvl > 5 && r_item > itemSpawnChance) {
+    if (type !== 'updown') {
+        if (['normal', 'moving', 'icy', 'conveyor'].includes(type) && lvl > 5 && r_item > 0.92) {
             let r_which = d.rng();
             if (r_which > 0.8) item = 'rocket';
             else if (r_which > 0.6) item = 'hat';
@@ -569,8 +528,8 @@ class Platform {
         this.lvl = lvl; Object.assign(this, data);
         this.broken = false; this.fallVy = 0; this.restoreTimer = 0; this.bounceAnim = 0; this.startY = data.y;
         this.isSolid = true; this.opacity = 1;
-        this.tilt = 0; 
-        this.isCracking = false; this.crackTimer = 0; 
+        this.tilt = 0; // Untuk jungkat jungkit platform es
+        this.isCracking = false; this.crackTimer = 0; // Timer retak platform kayu
     }
     getX() { 
         if (this.type === 'moving') {
@@ -593,8 +552,6 @@ class Platform {
                 if (this.crackTimer <= 0) {
                     this.broken = true; this.fallVy = 0; this.restoreTimer = 150;
                     spawnParticles(this.x + this.w/2, this.y, '#f59e0b', 15);
-                    // Broadcast Env Event MMO
-                    if (chan) chan.publish('env', { t: 'brk', l: this.lvl });
                 }
             }
             if (this.broken) {
@@ -605,6 +562,7 @@ class Platform {
                 }
             }
         }
+        // PLATFORM NAIK TURUN
         if (this.type === 'updown') {
             this.y = this.startY - (Math.sin((Date.now() + this.lvl * 500) / 600) * 0.5 + 0.5) * (PLAT_GAP * 1.8);
         }
@@ -614,22 +572,14 @@ class Platform {
         if (this.type === 'portal') { this.drawPortal(); return; }
         
         if (this.type === 'ground') {
-            ctx.save(); ctx.fillStyle = '#22c55e';
-            if (this.isRestArea) { // Menggambar Zona Aman / Rest Area
-                ctx.fillRect(this.x, this.y, this.w, 40);
-                ctx.fillStyle = '#166534'; ctx.fillRect(this.x, this.y, this.w, 15);
-                ctx.font = "900 16px 'Nunito',sans-serif"; ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.textAlign='center';
-                ctx.fillText("ZONA AMAN - LEVEL " + this.lvl, this.x + this.w/2, this.y + 32);
-            } else {
-                ctx.fillRect(this.x, this.y, this.w, H + 2000); 
-                ctx.fillStyle = '#166534'; ctx.fillRect(this.x, this.y, this.w, 15); 
-            }
-            ctx.restore(); return;
+            ctx.save(); ctx.fillStyle = '#22c55e'; ctx.fillRect(this.x, this.y, this.w, H + 2000); 
+            ctx.fillStyle = '#166534'; ctx.fillRect(this.x, this.y, this.w, 15); ctx.restore(); return;
         }
 
         let cx = this.x, cy = this.y, bounce = this.bounceAnim > 0 ? Math.sin((15-this.bounceAnim)/15 * Math.PI) * 5 : 0;
         ctx.save(); 
         
+        // Rotasi untuk Jungkat-Jungkit Icy Platform
         if (this.type === 'icy' && this.tilt !== 0) {
             ctx.translate(cx + this.w/2, cy);
             ctx.rotate(this.tilt);
@@ -687,6 +637,7 @@ class Platform {
             ctx.fillStyle = '#d8b4fe'; ctx.shadowColor = '#c084fc'; ctx.shadowBlur = 10;
             ctx.beginPath(); ctx.roundRect(cx, cy-5, this.w, 10, 5); ctx.fill(); ctx.shadowBlur = 0; ctx.strokeStyle = '#a855f7'; ctx.stroke();
         } else if (this.type === 'updown') { 
+            // Platform Mekanik Elevasi
             ctx.fillStyle = '#64748b'; ctx.beginPath(); ctx.roundRect(cx, cy-5, this.w, 10, 2); ctx.fill(); ctx.stroke();
             ctx.fillStyle = '#38bdf8'; 
             ctx.beginPath(); ctx.fillRect(cx + 4, cy - 2, this.w - 8, 4);
@@ -718,7 +669,7 @@ class StarObj {
         ctx.fillStyle = '#fbbf24'; ctx.strokeStyle = '#b45309'; ctx.lineWidth = 2.5; ctx.lineJoin='round'; ctx.beginPath();
         for(let i=0;i<10;i++) { let r=i%2===0?15:7; let a=(i/10)*Math.PI*2-Math.PI/2; let px=Math.cos(a)*r, py=Math.sin(a)*r; if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); }
         ctx.closePath(); ctx.fill(); ctx.stroke(); 
-        ctx.fillStyle='#fef3c7'; ctx.beginPath(); ctx.arc(-3,-3, 2,0,Math.PI*2); ctx.fill(); 
+        ctx.fillStyle='#fef3c7'; ctx.beginPath(); ctx.arc(-3,-3, 2,0,Math.PI*2); ctx.fill(); // Highlight kilap
         ctx.restore();
     }
 }
@@ -728,33 +679,34 @@ class ItemObj {
     update() { this.t += 0.08; }
     draw() {
         ctx.save(); ctx.translate(this.x, this.y + Math.sin(this.t)*6); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.lineJoin='round';
-        if (this.type === 'hat') { 
-            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(0,6,15,Math.PI,0); ctx.fill(); ctx.stroke(); 
-            ctx.beginPath(); ctx.moveTo(-20,6); ctx.lineTo(20,6); ctx.lineWidth=4.5; ctx.stroke(); 
-            ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,-9); ctx.lineTo(0,-18); ctx.stroke(); 
+        if (this.type === 'hat') { // Baling-baling lebih detail
+            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(0,6,15,Math.PI,0); ctx.fill(); ctx.stroke(); // Topi merah
+            ctx.beginPath(); ctx.moveTo(-20,6); ctx.lineTo(20,6); ctx.lineWidth=4.5; ctx.stroke(); // Lidah topi
+            ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,-9); ctx.lineTo(0,-18); ctx.stroke(); // Tiang
+            // Baling-baling muter
             let spin = Date.now()/50;
             ctx.fillStyle='#fde047'; ctx.beginPath(); ctx.ellipse(Math.cos(spin)*8, -18, 12, 4, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
             ctx.fillStyle='#3b82f6'; ctx.beginPath(); ctx.ellipse(Math.cos(spin+Math.PI)*8, -18, 12, 4, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        } else if (this.type === 'rocket') { 
+        } else if (this.type === 'rocket') { // Jetpack silver
             ctx.fillStyle = '#94a3b8'; ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(-10,6); ctx.lineTo(10,6); ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(-5,-2); ctx.lineTo(5,-2); ctx.fill(); 
+            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(-5,-2); ctx.lineTo(5,-2); ctx.fill(); // Tip merah
             ctx.fillStyle='#cbd5e1'; ctx.beginPath(); ctx.moveTo(-10,6); ctx.lineTo(-14,14); ctx.lineTo(-6,6); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(10,6); ctx.lineTo(14,14); ctx.lineTo(6,6); ctx.fill(); ctx.stroke();
-            ctx.fillStyle='#f59e0b'; ctx.beginPath(); ctx.arc(0,6, 4,0,Math.PI*2); ctx.fill(); 
-        } else if (this.type === 'dj') { 
+            ctx.fillStyle='#f59e0b'; ctx.beginPath(); ctx.arc(0,6, 4,0,Math.PI*2); ctx.fill(); // Nozzle
+        } else if (this.type === 'dj') { // Sayap emas estetik
             ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.ellipse(0, 0, 8, 10, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
             ctx.fillStyle = '#fff'; 
             ctx.beginPath(); ctx.ellipse(-14, -2, 10, 4, -0.5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
             ctx.beginPath(); ctx.ellipse(-10, 4, 8, 3, -0.2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
             ctx.beginPath(); ctx.ellipse(14, -2, 10, 4, 0.5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
             ctx.beginPath(); ctx.ellipse(10, 4, 8, 3, 0.2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        } else if (this.type === 'heart') { 
+        } else if (this.type === 'heart') { // Hati Kristal
             ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(-6, -2, 7, Math.PI, 0); ctx.arc(6, -2, 7, Math.PI, 0); ctx.lineTo(0, 12); ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-5, -3, 3, 5, -0.5, 0, Math.PI*2); ctx.fill(); 
-        } else if (this.type === 'balloon') { 
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-5, -3, 3, 5, -0.5, 0, Math.PI*2); ctx.fill(); // Highlight
+        } else if (this.type === 'balloon') { // Balon detail
             ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.ellipse(0, -8, 14, 18, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(-5, -12, 4, 8, -0.3, 0, Math.PI*2); ctx.fill(); 
+            ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(-5, -12, 4, 8, -0.3, 0, Math.PI*2); ctx.fill(); // Highlight
             ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(-3, 10); ctx.lineTo(3, 10); ctx.lineTo(0, 14); ctx.fill(); ctx.stroke();
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, 26); ctx.stroke(); 
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, 26); ctx.stroke(); // Tali
         }
         ctx.restore();
     }
@@ -809,10 +761,13 @@ function resetGame() {
     gameState = 'PLAY';
 }
 
+// ── CHARACTER DRAWING ENGINE (SMOOTH NO GEPENG) ──
 function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT, blT, chatMsg, chatTimer, expresT, isFalling, charType, isHurt, vy) {
     ctx.save();
     
     let eox = (facing === 'right') ? 5 : (facing === 'left') ? -5 : 0;
+    
+    // Y Offset Disesuaikan karena robot/ninja dihapus
     let nameYOffset = (charType === 'doodle') ? 52 : (charType === 'slime' ? 45 : 40);
 
     ctx.save();
@@ -835,6 +790,7 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
 
     let h = 38, w = 34;
 
+    // Aksesoris
     if (blT > 0) {
         ctx.fillStyle='#ef4444'; ctx.strokeStyle=INK; ctx.lineWidth=2.5;
         ctx.beginPath(); ctx.moveTo(0, -h); ctx.quadraticCurveTo(-18,-h-35, 0,-h-55); ctx.quadraticCurveTo(18,-h-35, 0,-h); ctx.fill(); ctx.stroke();
@@ -864,6 +820,7 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
         w = 34; h = 34;
         ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(-w/2, -h, w, h, 10); ctx.fill(); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.roundRect(-w/2 + 4, -h + 6, w - 8, 6, 3); ctx.fill();
+        
         ctx.fillStyle='rgba(255,150,150,.4)'; ctx.beginPath(); ctx.arc(-11+eox,-h*.3,5,0,Math.PI*2); ctx.arc(11+eox,-h*.3,5,0,Math.PI*2); ctx.fill();
         ctx.fillStyle=INK;
         
@@ -888,9 +845,9 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
         ctx.beginPath(); ctx.moveTo(0, -h-6); ctx.quadraticCurveTo(w/2+4, -h+10, w/2, 0); 
         ctx.quadraticCurveTo(w/4, 2, 0, 0); ctx.quadraticCurveTo(-w/4, 2, -w/2, 0); ctx.quadraticCurveTo(-w/2-4, -h+10, 0, -h-6); ctx.fill(); ctx.stroke();
         ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(-w/4, -h/2, 5, 10, -0.3, 0, Math.PI*2); ctx.fill();
+
         ctx.fillStyle='rgba(255,150,150,.4)'; ctx.beginPath(); ctx.arc(-12+eox,-h*.3,4,0,Math.PI*2); ctx.arc(12+eox,-h*.3,4,0,Math.PI*2); ctx.fill();
         ctx.fillStyle=INK;
-        
         if (isHurt) {
             ctx.beginPath(); ctx.moveTo(-10+eox, -h*.5); ctx.lineTo(-6+eox, -h*.4); ctx.lineTo(-10+eox, -h*.3); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(10+eox, -h*.5); ctx.lineTo(6+eox, -h*.4); ctx.lineTo(10+eox, -h*.3); ctx.stroke();
@@ -912,7 +869,9 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
         grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, color);
         ctx.fillStyle=grad;
         ctx.beginPath(); ctx.moveTo(0,-h); ctx.bezierCurveTo(w*.6,-h, w/2+4,0, 0,0); ctx.bezierCurveTo(-w/2-4,0, -w*.6,-h, 0,-h); ctx.fill(); ctx.stroke();
+        
         ctx.fillStyle='rgba(255,150,150,.35)'; ctx.beginPath(); ctx.arc(-10+eox,-h*.45,4,0,Math.PI*2); ctx.arc(10+eox,-h*.45,4,0,Math.PI*2); ctx.fill();
+
         ctx.fillStyle=INK;
         if (isHurt) {
             let eyeSize = 3.5;
@@ -931,6 +890,7 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
             ctx.beginPath(); ctx.arc(-6+eox,-h*.65,2.5,0,Math.PI*2); ctx.arc(6+eox,-h*.65,2.5,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(eox,-h*.45,3,.15,Math.PI-.15); ctx.stroke();
         }
     }
+
     ctx.restore();
 }
 
@@ -962,8 +922,6 @@ function triggerJump() {
         if (pl && pl.type === 'fragile') {
             pl.broken = true; pl.isCracking = false; pl.restoreTimer = 150;
             spawnParticles(pl.x + pl.w/2, pl.y, '#f59e0b', 15);
-            // Broadcast Env Event MMO
-            if (chan) chan.publish('env', { t: 'brk', l: pl.lvl });
         }
     } else if (p.djTimer > 0 && p.hasDJ && !p.isFreeFalling) {
         p.vy = JUMP_FORCE;
@@ -984,20 +942,20 @@ function loop() {
     requestAnimationFrame(loop); ctx.clearRect(0,0,W,H);
     if (gameState === 'MENU') return;
 
-    // FASE 3.1: Dinamika Bioma & Background Warna (Ditentukan oleh ketinggian rata-rata pemain)
-    let currentLvl = Math.max(0, Math.floor((GROUND_Y - camY + H/2) / PLAT_GAP));
-    let biome = getBiome(currentLvl);
-    let bc = biome.colors;
-    document.getElementById('gameContainer').style.background = `linear-gradient(180deg, rgb(${bc[0]},${bc[1]},${bc[2]}) 0%, rgb(${bc[3]},${bc[4]},${bc[5]}) 100%)`;
-    
-    let badge = document.getElementById('biomeBadge');
-    badge.textContent = biome.name;
-    badge.style.background = biome.badgeBg;
+    let heightRatio = Math.min(1, currentMeters / 1000); 
+    let r1 = Math.floor(224 - (224 - 15) * heightRatio); 
+    let g1 = Math.floor(231 - (231 - 23) * heightRatio);
+    let b1 = Math.floor(255 - (255 - 42) * heightRatio);
+    let r2 = Math.floor(248 - (248 - 30) * heightRatio); 
+    let g2 = Math.floor(250 - (250 - 27) * heightRatio);
+    let b2 = Math.floor(252 - (252 - 75) * heightRatio);
+    document.getElementById('gameContainer').style.background = `linear-gradient(180deg, rgb(${r1},${g1},${b1}) 0%, rgb(${r2},${g2},${b2}) 100%)`;
 
     p.oldY = p.y; p.expressionTimer++; 
     if (p.chatTimer > 0) p.chatTimer--;
     if (p.hurtTimer > 0) p.hurtTimer--; 
     
+    // HUD POWER BAR 
     const pwrCon = document.getElementById('powerBar'), pwrFill = document.getElementById('powerFill');
     if (p.rocketTimer > 0) { pwrCon.style.display='block'; pwrFill.style.width=(p.rocketTimer/80*100)+'%'; pwrFill.style.background='#ef4444'; }
     else if (p.flyTimer > 0) { pwrCon.style.display='block'; pwrFill.style.width=(p.flyTimer/150*100)+'%'; pwrFill.style.background='#60a5fa'; }
@@ -1018,6 +976,7 @@ function loop() {
     else if (displayScore > currentMeters) { displayScore -= Math.max(1, (displayScore - currentMeters) * 0.08); if (displayScore < currentMeters) displayScore = currentMeters; }
     document.getElementById('scoreVal').textContent = Math.floor(displayScore) + 'm';
 
+    // LOGIKA FISIKA
     TERMINAL_V = (p.balloonTimer > 0 && p.vy > 0) ? 4 : 18; 
 
     if (p.rocketTimer > 0) { p.rocketTimer--; p.vy = ROCKET_FORCE; }
@@ -1029,22 +988,26 @@ function loop() {
 
     let targetVx = 0;
     
+    // Logika Jungkat-Jungkit Platform Es & Sliding (Gaya Geser)
     for (let [k, pl] of platforms) {
         if (pl.type === 'icy') {
             if (p.currentPlatform === pl && p.isIdle && !p.isFreeFalling) {
                 let center = pl.x + pl.w / 2;
                 let offset = p.x - center;
-                let maxTilt = 0.35; 
+                let maxTilt = 0.35; // Maksimal sudut kemiringan (Radian)
                 let targetTilt = (offset / (pl.w / 2)) * maxTilt;
-                pl.tilt += (targetTilt - pl.tilt) * 0.15; 
+                pl.tilt += (targetTilt - pl.tilt) * 0.15; // Halus miringnya
+                
+                // Beri gaya geser ke karakter
                 p.vx += Math.sin(pl.tilt) * 2.5; 
             } else {
-                pl.tilt += (0 - pl.tilt) * 0.05; 
+                pl.tilt += (0 - pl.tilt) * 0.05; // Balik ke datar kalau gak diinjak
             }
         }
     }
 
     if (p.isIdle) {
+        // Jangan paksa p.vx = 0 kalau di es (biar dia bisa merosot)
         if (!p.currentPlatform || p.currentPlatform.type !== 'icy') {
             p.vx = 0; 
         }
@@ -1056,9 +1019,17 @@ function loop() {
                 p.x += pl.dir * 2.5;
                 p.platOffsetX = p.x - pl.x;
             }
-            if (pl.type === 'updown') { p.y = pl.y; }
-            if (pl.type === 'fragile' && pl.broken) { p.isIdle = false; p.currentPlatform = null; }
-            if (p.currentPlatform && (p.x < pl.x || p.x > pl.x + pl.w)) { p.isIdle = false; p.currentPlatform = null; }
+            if (pl.type === 'updown') {
+                p.y = pl.y; // Ikut naik turun
+            }
+            if (pl.type === 'fragile' && pl.broken) {
+                p.isIdle = false; p.currentPlatform = null; // Jatuh karena kayunya hancur
+            }
+            
+            // Jatuh jika melewati batas ujung platform
+            if (p.currentPlatform && (p.x < pl.x || p.x > pl.x + pl.w)) {
+                p.isIdle = false; p.currentPlatform = null;
+            }
         }
 
         if (p.isIdle && (keys.left || keys.right)) { 
@@ -1072,13 +1043,13 @@ function loop() {
             if (pl && pl.type === 'fragile') {
                 pl.broken = true; pl.isCracking = false; pl.restoreTimer = 150;
                 spawnParticles(pl.x + pl.w/2, pl.y, '#f59e0b', 15);
-                if (chan) chan.publish('env', { t: 'brk', l: pl.lvl });
             }
         }
     } else {
         if (keys.left) { targetVx = -MOVE_SPEED; p.facing = 'left'; }
         else if (keys.right) { targetVx = MOVE_SPEED; p.facing = 'right'; }
         
+        // Sedikit licin di es saat melayang di atasnya
         let friction = (p.currentPlatform && p.currentPlatform.type === 'icy') ? 0.05 : 0.3;
         p.vx += (targetVx - p.vx) * friction;
     }
@@ -1086,6 +1057,7 @@ function loop() {
     p.x += p.vx; p.y += p.vy;
     if (p.x < -25) p.x = MAP_W+25; else if (p.x > MAP_W+25) p.x = -25;
 
+    // ── ANIMASI SQUASH/STRETCH DIHALUSKAN SANGAT MINIMAL ──
     let targetSx = 1, targetSy = 1;
     if (p.isIdle) {
         p.idleBreath += 0.08;
@@ -1097,6 +1069,7 @@ function loop() {
     p.scaleX += (targetSx - p.scaleX) * 0.3;
     p.scaleY += (targetSy - p.scaleY) * 0.3;
 
+    // Kematian & Penyelamat
     if (gameState === 'PLAY' && p.y > camY + H + 50 && !p.isFreeFalling) {
         if (p.hasHeart) {
             p.hasHeart = false; p.vy = -45; p.y = camY + H - 10;
@@ -1109,16 +1082,21 @@ function loop() {
         }
     }
 
+    // Hantam Tanah (Ground Impact)
     if (p.y >= GROUND_Y) {
         p.y = GROUND_Y;
         if (p.isFreeFalling) {
             p.vy = 0; p.vx = 0; p.isFreeFalling = false;
+            
             spawnParticles(p.x, GROUND_Y, '#ef4444', 40);
             triggerScreenShake(); 
+            
             p.chatMsg = 'Aduh... Ayo naik!'; p.chatTimer = 120; 
             p.hurtTimer = 40; 
             if (chan) chan.publish('chat', {t: 'Aduh... Ayo naik!'});
+            
             lbSubmit(playerName, highScore); 
+            
             p.isIdle = true; p.hasDJ = true; p.currentPlatform = null;
         } else if (p.vy > 0) {
             if (!keys.left && !keys.right) { 
@@ -1128,6 +1106,7 @@ function loop() {
         }
     }
 
+    // KAMERA
     if (p.isFreeFalling) { 
         camY += ((p.y - H/2) - camY) * 0.15; 
     } else if (gameState === 'PLAY') { 
@@ -1135,6 +1114,7 @@ function loop() {
         if (tCam < camY) {
             camY += (tCam-camY)*.22; 
         } else if (p.currentPlatform && p.currentPlatform.type === 'updown') {
+            // Biarkan kamera ngikut turun agar tidak mati saat platform turun kebawah layar
             let limitCam = p.y - H*.65;
             if (camY < limitCam) camY += (limitCam - camY) * 0.15;
         }
@@ -1183,11 +1163,13 @@ function loop() {
         }
     }
 
+    // Cek Pijakan Platform
     if (gameState === 'PLAY' && p.vy > 0 && p.flyTimer<=0 && p.rocketTimer<=0 && !p.isIdle && !p.isFreeFalling) {
         for (let [k,pl] of platforms) {
             if (pl.broken || !pl.isSolid || pl.y > camY + H + 10) continue; 
             
             let rx = pl.x;
+            // Kalkulasi Hitbox Permukaan Miring Untuk Icy
             let hitY = pl.y;
             if (pl.type === 'icy' && pl.tilt !== 0) {
                 hitY = pl.y + Math.tan(pl.tilt) * (p.x - (rx + pl.w/2));
@@ -1199,13 +1181,12 @@ function loop() {
                 if (pl.type==='portal') { spawnParticles(p.x, p.y, '#a855f7', 20); p.y -= 1000; camY -= 1000; p.vy = JUMP_FORCE; break; }
                 if (pl.type==='bumper') { p.vy = BUMPER_FORCE; p.vx = (p.x < rx+pl.w/2) ? -16 : 16; spawnParticles(p.x,p.y,'#f0abfc',12); pl.bounceAnim=15; break; }
                 if (pl.type==='fragile') {
-                    if (!pl.isCracking) { pl.isCracking = true; pl.crackTimer = 45; } 
+                    if (!pl.isCracking) { pl.isCracking = true; pl.crackTimer = 45; } // Retak dalam ~0.75 detik
                     if (!keys.left && !keys.right) {
                         p.isIdle=true; p.currentPlatform=pl; p.idleBreath=0; p.platOffsetX=p.x-pl.x; p.vy=0;
                     } else {
                         p.vy=JUMP_FORCE; pl.broken=true; pl.isCracking=false; pl.restoreTimer=150;
                         spawnParticles(rx+pl.w/2, pl.y, '#f59e0b', 15);
-                        if (chan) chan.publish('env', { t: 'brk', l: pl.lvl });
                     }
                     break; 
                 }
@@ -1234,6 +1215,7 @@ function loop() {
         ctx.fill(); ctx.globalAlpha=1;
     }
 
+    // MULTIPLAYER RENDER 
     let renderDelay = 80; 
     let renderTime = Date.now() - renderDelay;
     for (let id in peers) {
