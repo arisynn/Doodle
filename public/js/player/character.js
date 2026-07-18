@@ -63,24 +63,22 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
     
     if (sprite && sprite.complete && sprite.naturalWidth > 0) {
         // Draw image skin
-        let frameCount = 4;
+        let frameCount = (sprite.naturalWidth / sprite.naturalHeight >= 2.5) ? 4 : 1;
         let frameW = sprite.naturalWidth / frameCount;
         let frameH = sprite.naturalHeight;
-        
-        // Use an animation speed, e.g. 100ms per frame
-        let frameSpeed = 100; 
-        
-        // To make it look right even if not all frames are filled (just in case), we bound it
-        let currentFrame = Math.floor(Date.now() / frameSpeed) % frameCount;
             
-        // If image is just 1x1 placeholder, draw a colored box as fallback
+        let frameSpeed = 100; 
+        let currentFrame = Math.floor(Date.now() / frameSpeed) % frameCount;
+                
         if (sprite.naturalWidth <= 1 && sprite.naturalHeight <= 1) {
             ctx.fillStyle = color;
             ctx.fillRect(-w/2, -h, w, h);
             ctx.strokeRect(-w/2, -h, w, h);
         } else {
-            // Assume sprites are anchored at bottom center (0, 0) relative to translation
-            ctx.drawImage(sprite, currentFrame * frameW, 0, frameW, frameH, -frameW/2, -frameH, frameW, frameH);
+            let targetH = 50;
+            let scale = targetH / frameH;
+            let targetW = frameW * scale;
+            ctx.drawImage(sprite, currentFrame * frameW, 0, frameW, frameH, -targetW/2, -targetH, targetW, targetH);
         }
     } else {
         // Fallback drawing if not loaded
