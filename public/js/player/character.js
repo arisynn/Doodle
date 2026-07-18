@@ -63,7 +63,8 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
     
     if (sprite && sprite.complete && sprite.naturalWidth > 0) {
         // Draw image skin
-        let frameCount = (sprite.naturalWidth / sprite.naturalHeight >= 2.5) ? 4 : 1;
+        // Setiap sprite dianggap memiliki 4 frame animasi (berjejer horizontal)
+        let frameCount = 4;
         let frameW = sprite.naturalWidth / frameCount;
         let frameH = sprite.naturalHeight;
             
@@ -75,9 +76,13 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
             ctx.fillRect(-w/2, -h, w, h);
             ctx.strokeRect(-w/2, -h, w, h);
         } else {
-            let targetH = 50;
-            let scale = targetH / frameH;
-            let targetW = frameW * scale;
+            // Kita tetapkan aturan ukuran karakter agar selalu presisi dan konsisten di canvas.
+            // Misalnya tinggi karakter = 45px. Kita hitung lebar berdasarkan rasio asli sprite.
+            let targetH = 45;
+            let spriteRatio = frameW / frameH;
+            let targetW = targetH * spriteRatio;
+            
+            // Draw di canvas dengan posisi anchor berada di bawah tengah (0, 0)
             ctx.drawImage(sprite, currentFrame * frameW, 0, frameW, frameH, -targetW/2, -targetH, targetW, targetH);
         }
     } else {
