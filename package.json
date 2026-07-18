@@ -1,0 +1,16 @@
+{
+  "name": "doodle-mmo",
+  "version": "1.0.0",
+  "description": "Doodle MMO imported from GitHub",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "cp index.html public/",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "image-size": "^2.0.2",
+    "jsdom": "^29.1.1"
+  }
+}

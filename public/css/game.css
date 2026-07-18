@@ -1,0 +1,11 @@
+/* ── TOUCH ZONES ── */
+#touchZone{position:absolute;bottom:0;left:0;width:100%;height:100%;z-index:5;display:none;}
+.tz{position:absolute;bottom:0;height:65%;}
+#tzL{left:0;width:50%;}
+#tzR{right:0;width:50%;}
+#tzJ{top:0;left:0;width:100%;height:35%;}
+
+.float-txt{position:absolute;pointer-events:none;z-index:40;
+    font-family:'Nunito',sans-serif;font-weight:900;font-size:1.3rem;
+    text-shadow:0 3px 0 #000, 0 -2px 0 #000, 2px 0 0 #000, -2px 0 0 #000;
+    animation:floatUp 1.2s ease-out forwards;text-align:center;width:200px;margin-left:-100px;letter-spacing:1px;}

@@ -1,0 +1,70 @@
+/* ── MODAL ── */
+#overlay{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    background:rgba(15,23,42,.7);backdrop-filter:blur(8px);}
+.modal{background:white;border:4px solid #1e293b;border-radius:24px;
+    box-shadow:8px 8px 0 #1e293b;padding:24px 20px;width:90%;max-width:350px;text-align:center;
+    animation:popIn .4s cubic-bezier(.34,1.56,.64,1);}
+.modal h1{font-size:2.4rem;font-family:'Nunito',sans-serif;font-weight:900;line-height:1;color:#1e293b;}
+.modal h1 span{color:#3b82f6;}
+
+.modal-sub {
+    display: inline-block; font-size:.8rem; letter-spacing:.05em; text-transform:uppercase; 
+    color:#64748b; margin:6px 0 16px; font-weight:900; text-decoration: none;
+    background: #f1f5f9; padding: 4px 10px; border-radius: 12px; border: 1.5px solid #cbd5e1;
+    transition: all 0.2s;
+}
+.modal-sub:hover { background: #e2e8f0; border-color: #94a3b8; transform: scale(1.05); }
+.ig-handle { color: #e11d48; }
+
+.doodle-input{width:100%;padding:12px 16px;border:3px solid #cbd5e1;border-radius:14px;
+    font-family:'Patrick Hand',cursive;font-size:1.2rem;text-align:center;outline:none;background:#f8fafc;transition:all .2s;}
+.doodle-input:focus{border-color:#3b82f6;background:#fff;box-shadow:0 0 0 4px #bfdbfe;}
+
+.cat-title {font-size:.8rem;color:#475569;font-weight:900;text-transform:uppercase;margin:12px 0 6px;letter-spacing:1px;}
+.color-row{display:flex;justify-content:center;gap:10px;margin-bottom:12px;}
+.color-dot{width:36px;height:36px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:all .2s; position:relative;}
+.color-dot.selected{border-color:#1e293b;transform:scale(1.2);box-shadow:0 4px 10px rgba(0,0,0,0.2);}
+
+.char-sel{border-radius:12px;}
+
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:10px;
+    width:100%;padding:14px;border:3px solid #1e40af;border-radius:14px;
+    background:linear-gradient(135deg,#3b82f6,#4f46e5);color:white;
+    font-family:'Nunito',sans-serif;font-size:1.2rem;font-weight:900;cursor:pointer;
+    box-shadow:0 6px 0 #1e40af;transition:all .1s; margin-top:16px; text-transform:uppercase;}
+.btn-primary:active{transform:translateY(4px);box-shadow:0 2px 0 #1e40af;}
+#errMsg{color:#ef4444;font-size:.9rem;font-weight:700;min-height:20px;margin:6px 0;}
+
+/* ── NEW UI SCREENS ── */
+.currency-panel { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 10px 15px; border-radius: 12px; margin: 15px 0; border: 2px solid #cbd5e1; }
+.currency-item { display: flex; align-items: center; gap: 6px; font-weight: 900; color: #b45309; font-size: 1.1rem; }
+.user-greeting { font-weight: 800; color: #475569; font-size: 0.9rem; }
+.daily-challenge { background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 2px dashed #fbbf24; border-radius: 12px; padding: 12px; margin-bottom: 15px; text-align: left; position: relative; }
+.dc-header { font-weight: 900; color: #d97706; font-size: 0.9rem; text-transform: uppercase; margin-bottom: 4px; }
+.dc-text { font-size: 0.85rem; color: #475569; font-weight: 700; margin-bottom: 8px; }
+.dc-progress { background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 6px; }
+.dc-fill { background: #3b82f6; height: 100%; transition: width 0.3s; }
+.dc-reward { font-size: 0.75rem; color: #059669; font-weight: 800; }
+.menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn-menu { padding: 12px; border: 3px solid #1e293b; border-radius: 12px; background: white; font-family: 'Nunito', sans-serif; font-weight: 900; cursor: pointer; transition: all 0.1s; box-shadow: 0 4px 0 #1e293b; color: #1e293b; font-size: 0.9rem; }
+.btn-menu:active { transform: translateY(4px); box-shadow: 0 0px 0 #1e293b; }
+.play-btn { grid-column: span 2; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border-color: #14532d; box-shadow: 0 6px 0 #14532d; font-size: 1.2rem; padding: 16px; margin-bottom: 5px; }
+.play-btn:active { transform: translateY(6px); box-shadow: 0 0px 0 #14532d; }
+
+.panel-screen { padding: 0; display: flex; flex-direction: column; overflow: hidden; max-height: 80vh; }
+.panel-header { background: #1e293b; color: white; padding: 15px; display: flex; justify-content: space-between; align-items: center; border-radius: 20px 20px 0 0; }
+.panel-header h2 { font-weight: 900; margin: 0; font-size: 1.2rem; }
+.panel-content { padding: 20px; flex: 1; overflow-y: auto; text-align: left; }
+.btn-back { background: #f1f5f9; border: none; border-top: 2px solid #cbd5e1; padding: 15px; width: 100%; font-family: 'Nunito', sans-serif; font-weight: 900; color: #64748b; cursor: pointer; border-radius: 0 0 20px 20px; }
+.btn-back:hover { background: #e2e8f0; }
+.scrollable { max-height: 300px; overflow-y: auto; }
+
+/* Items List */
+.list-item { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+.list-info h4 { margin: 0 0 2px 0; color: #1e293b; font-size: 0.95rem; font-weight: 800; }
+.list-info p { margin: 0; font-size: 0.75rem; color: #64748b; }
+.list-reward { font-weight: 900; color: #d97706; font-size: 0.85rem; }
+.list-status { font-size: 0.75rem; font-weight: 800; color: #10b981; }
+
+.color-dot.locked::after { content: '[X]'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; background: rgba(255,255,255,0.5); border-radius: inherit; }
+.btn-buy { background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 900; cursor: pointer; font-family: 'Nunito', sans-serif; }

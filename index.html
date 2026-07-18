@@ -1,0 +1,417 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#475569">
+    <title>Doodle MMO — Play With Friends!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Patrick+Hand&display=swap" rel="stylesheet">
+    <script>
+    (function() {
+        // Inline Manifest creation
+        const manifest = {
+            name: "Doodle MMO",
+            short_name: "DoodleMMO",
+            start_url: ".",
+            display: "standalone",
+            background_color: "#475569",
+            theme_color: "#475569",
+            icons: [
+                {
+                    src: "logo.svg",
+                    sizes: "192x192",
+                    type: "image/svg+xml",
+                    purpose: "any maskable"
+                }
+            ]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = manifestUrl;
+        document.head.appendChild(link);
+
+        // Dummy Service Worker
+        const swCode = `
+            self.addEventListener('install', (e) => { self.skipWaiting(); });
+            self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
+            self.addEventListener('fetch', (e) => { });
+        `;
+        const swBlob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(swUrl).catch(e => console.log('SW Reg Failed', e));
+        }
+    })();
+    </script>
+    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/animation.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/hud.css">
+    <link rel="stylesheet" href="css/menu.css">
+    <link rel="stylesheet" href="css/chat.css">
+    <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+    <!-- PWA Install Prompt Overlay -->
+    <div id="pwaInstallPrompt" style="display:none; position:fixed; inset:0; background:#0f172a; z-index:9999; flex-direction:column; justify-content:center; align-items:center; color:white; font-family:'Nunito', sans-serif; text-align:center; padding:20px;">
+        <img src="logo.svg" onerror="this.src='logo.svg'" alt="App Icon" style="width:100px; height:100px; margin-bottom:20px;">
+        <h1 style="font-size:2.2rem; font-weight:900; margin-bottom:10px; color:#f8fafc; font-family:'Patrick Hand',cursive;">Install Doodle MMO</h1>
+        <p style="font-size:1.1rem; color:#cbd5e1; max-width:300px; margin-bottom:30px; font-weight:700;">
+            Game ini hanya bisa dimainkan setelah diinstal ke Home Screen (Full Screen Mode).
+        </p>
+        
+        <div style="background:#1e293b; padding:20px; border-radius:16px; border:2px solid #334155; text-align:left; max-width:320px; width:100%;">
+            <p style="font-weight:800; color:#38bdf8; margin-bottom:10px;">Untuk iOS (Safari):</p>
+            <ol style="margin-left:20px; color:#94a3b8; font-weight:700; font-size:0.95rem; margin-bottom:20px;">
+                <li style="margin-bottom:8px;">Tekan tombol Share <svg style="display:inline-block; vertical-align:middle; width:18px; height:18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg></li>
+                <li>Pilih "Add to Home Screen" <svg style="display:inline-block; vertical-align:middle; width:18px; height:18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg></li>
+            </ol>
+            
+            <p style="font-weight:800; color:#4ade80; margin-bottom:10px;">Untuk Android (Chrome):</p>
+            <ol style="margin-left:20px; color:#94a3b8; font-weight:700; font-size:0.95rem;">
+                <li style="margin-bottom:8px;">Tekan menu titik tiga <svg style="display:inline-block; vertical-align:middle; width:18px; height:18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg></li>
+                <li>Pilih "Install app" atau "Add to Home Screen"</li>
+            </ol>
+        </div>
+    </div>
+    <script>
+    (function() {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        // Comment out next line for dev testing if needed
+        if (!isStandalone) {
+            document.addEventListener('DOMContentLoaded', () => {
+                document.getElementById('pwaInstallPrompt').style.display = 'flex';
+                document.getElementById('gameContainer').style.display = 'none';
+            });
+        }
+    })();
+    </script>
+
+<div id="gameContainer">
+    <div class="bg-grid"></div>
+    <canvas id="gc"></canvas>    <!-- HUD -->
+    <div id="hudLayer">
+        <div class="hud-header" id="hudHeader" style="display:none; width: 100%;">
+            <!-- LEFT PANEL: Menu & Score -->
+            <div class="hud-pill" style="display:flex; align-items:center; gap:8px;">
+                <button id="hudMenuBtn" class="icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="3"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <div style="width: 2px; height: 20px; background: #cbd5e1; border-radius: 2px;"></div>
+                <div style="display:flex; flex-direction:column;">
+                    <div style="display:flex; align-items:center; gap:4px;">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5"><path d="M21 18l-7-10-3 5-4-6-5 11h19z" fill="#fef3c7"/><path d="M21 18l-7-10-3 5-4-6-5 11h19z"/></svg>
+                        <span id="scoreVal" style="font-size:1.2rem; color:#2563eb; font-weight:900; line-height:1; font-family:'Nunito',sans-serif;">0m</span>
+                    </div>
+                    
+                    <div style="font-size:0.7rem; color:#64748b; font-weight:700;">Best: <span id="highScoreVal">0m</span></div>
+                    
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: Online & Leaderboard -->
+            <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                <div class="hud-pill" style="display:flex; align-items:center; gap:8px;">
+                    <div class="flex-center" style="gap:4px;" title="Players Online">
+                        <div class="dot-pulse" style="width:6px;height:6px;"></div>
+                        <span id="onlineCnt" style="color:#b45309; font-weight:900; font-size:0.9rem;">1</span>
+                    </div>
+                    <div style="width: 2px; height: 20px; background: #cbd5e1; border-radius: 2px;"></div>
+                    <button id="lbToggle" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5"><path d="M18 20V10M12 20V4M6 20v-4"/></svg>
+                    </button>
+                </div>
+
+                <!-- LEADERBOARD PANEL -->
+                <div id="lbPanel" class="hud-card" style="display:none; margin-top: 8px; width: 220px; text-align:left;">
+                    <div style="font-size:0.8rem; font-weight:900; color:#475569; margin-bottom: 6px; text-transform: uppercase;">Live Room</div>
+                    <div id="liveTopListRows" style="margin-bottom: 10px;"></div>
+                    
+                    <div style="font-size:0.8rem; font-weight:900; color:#475569; margin-bottom: 6px; padding-top: 6px; border-top: 1.5px dashed #cbd5e1; text-transform: uppercase;">Global Top 10</div>
+                    <div id="lbRows"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- POWER BAR & HEART -->
+        <div style="position: absolute; left: 12px; top: 70px;">
+            <div id="powerBar" style="display:none;"><div id="powerFill"></div></div>
+            <div id="heartContainer" style="display:none; align-items:center; gap:6px; margin-top:6px; background:rgba(255,255,255,0.9); padding:4px 8px; border-radius:12px; border:2px solid #cbd5e1;">
+                <svg class="icon-sm" viewBox="0 0 24 24" fill="#ef4444" stroke="#b91c1c" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                <span style="font-size:0.75rem; font-weight:900; color:#ef4444;">PENYELAMAT</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start Screen Modal -->
+    <div id="overlay">
+        <!-- LOGIN SCREEN -->
+        <div class="modal" id="loginScreen">
+            <h1>DOODLE <span>MMO</span></h1>
+            
+            <a href="https://instagram.com/kryn.yon" target="_blank" class="modal-sub">
+                A game by <span class="ig-handle">@kryn.yon</span>
+            </a>
+
+            <input type="text" class="doodle-input" id="nameInput" placeholder="Ketik Namamu..." maxlength="10">
+            <div id="errMsg"></div>
+
+            <button class="btn-primary" id="loginBtn">
+                LOGIN / REGISTER
+            </button>
+        </div>
+
+        <!-- MAIN MENU SCREEN -->
+        <div class="modal" id="mainMenuScreen" style="display:none; position:relative;">
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+                <h1 style="font-size: 1.8rem; margin:0;">DOODLE <span>MMO</span></h1>
+                <button class="icon-btn" id="btnSettings" style="background:#f1f5f9; border: 2px solid #cbd5e1;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+            </div>
+            
+            <div style="background:#f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 15px; margin-bottom: 12px; display:flex; align-items:center; gap:15px;">
+                <div id="menuCharPreview" style="width: 50px; height: 50px; background: #e2e8f0; border-radius: 12px; border: 3px solid #1e293b; display:flex; justify-content:center; align-items:center; font-weight:900; font-size:24px;">D</div>
+                <div style="text-align:left; flex: 1;">
+                    <div class="user-greeting" style="font-size:1.1rem; color:#1e293b;">Hi, <span id="menuPlayerName" style="color:#3b82f6;">Player</span>!</div>
+                    
+                    <div style="display:flex; gap: 10px; margin-top:2px;">
+                        <div class="currency-item" style="font-size: 0.9rem;">
+                            <svg class="icon-sm" viewBox="0 0 24 24" fill="#fbbf24" stroke="#d97706" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                            <span id="coinDisplay">0</span>
+                        </div>
+                        <div class="currency-item" style="font-size: 0.9rem; color: #059669;">
+                            <svg class="icon-sm" viewBox="0 0 24 24" fill="#34d399" stroke="#059669" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon></svg>
+                            <span id="gemDisplay">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="daily-challenge" id="dailyChallengeCard">
+                <div class="dc-header">
+                    Daily Challenge
+                </div>
+                <div class="dc-text" id="dcText">Reach 500m in one run</div>
+                <div class="dc-progress">
+                    <div class="dc-fill" id="dcFill" style="width: 0%;"></div>
+                </div>
+                <div class="dc-reward" id="dcReward">Reward: 50 Coins</div>
+            </div>
+
+            <div class="menu-grid">
+                <button class="btn-menu play-btn" id="btnPlay">PLAY NOW</button>
+                <button class="btn-menu" id="btnShop">SHOP</button>
+                <button class="btn-menu" id="btnMissions">MISSIONS</button>
+                <button class="btn-menu" id="btnAchievements">ACHIEVEMENTS</button>
+                <button class="btn-menu" id="btnStats">STATS</button>
+                <button class="btn-menu" id="btnUpgrades" style="grid-column: span 2; background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-color: #818cf8;">UPGRADES</button>
+            </div>
+        </div>
+
+        <!-- SHOP SCREEN -->
+        <div class="modal panel-screen" id="shopScreen" style="display:none;">
+            <div class="panel-header">
+                <h2>SHOP</h2>
+                <div style="display:flex; gap:10px;">
+    <div class="currency-item" style="display:flex; align-items:center;"><svg class="icon-sm" viewBox="0 0 24 24" fill="#fbbf24" stroke="#d97706" stroke-width="2" style="width:18px;height:18px;margin-right:5px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg><span id="shopCoinDisplay">0</span></div>
+<div class="currency-item" style="color:#059669; display:flex; align-items:center;"><svg class="icon-sm" viewBox="0 0 24 24" fill="#34d399" stroke="#059669" stroke-width="2" style="width:18px;height:18px;margin-right:5px;"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon></svg><span id="shopGemDisplay">0</span></div>
+</div>
+            </div>
+            
+                        <div class="panel-content scrollable" style="padding: 0;">
+                <!-- RPG Style Character Preview Area -->
+                <div style="background: linear-gradient(180deg, #1e293b, #0f172a); width: 100%; padding: 30px 20px; display: flex; flex-direction: column; align-items: center; position: relative;">
+                    <!-- Platform -->
+                    <div style="width: 120px; height: 30px; background: rgba(255,255,255,0.1); border-radius: 50%; position: absolute; bottom: 20px; box-shadow: 0 0 20px rgba(96, 165, 250, 0.2);"></div>
+                    <!-- Big Preview Image -->
+                    
+<style>
+@keyframes shop-sprite-idle {
+    0%, 24.99% { background-position: 0% 0%; }
+    25%, 49.99% { background-position: 33.333% 0%; }
+    50%, 74.99% { background-position: 66.666% 0%; }
+    75%, 100% { background-position: 100% 0%; }
+}
+    33.333% { background-position: 33.333% 0%; }
+    66.666% { background-position: 66.666% 0%; }
+    100% { background-position: 100% 0%; }
+}
+.shop-big-preview-anim {
+    animation: shop-sprite-idle 0.4s infinite;
+}
+</style>
+<div id="shopBigPreview" class="shop-big-preview-anim" style="width: 120px; height: 120px; z-index: 1; transform: translateY(-10px); filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5)); background-size: 400% 100%; background-repeat: no-repeat; image-rendering: pixelated;"></div>
+
+                    <!-- Skin Name -->
+                    <h3 id="shopSkinName" style="color: white; font-family: 'Patrick Hand', cursive; font-size: 2rem; margin: 15px 0 5px 0; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Default</h3>
+                    
+                    <div id="shopActionArea" style="display:flex; flex-direction:column; align-items:center; min-height: 40px; margin-top: 10px;">
+                        <span id="shopMsg" style="font-size: 0.9rem; font-weight: 700; color: #94a3b8; margin-bottom: 8px;">Pilih item</span>
+                        <button id="buyBtn" class="btn-buy" style="display:none; width: 200px; padding: 12px; font-size: 1.1rem;"></button>
+                    </div>
+                </div>
+                
+                <!-- Skins Grid -->
+                <div style="padding: 20px;">
+                    <p class="cat-title" style="margin-top: 0;">Available Skins</p>
+                    <div class="color-row" id="charRow" style="flex-wrap: wrap; gap: 12px; justify-content: center;">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+            </div>
+            <button class="btn-back" id="shopBack">KEMBALI</button>
+        </div>
+
+        <!-- MISSIONS SCREEN -->
+        <div class="modal panel-screen" id="missionsScreen" style="display:none;">
+            <div class="panel-header"><h2>MISSIONS</h2></div>
+            <div class="panel-content scrollable" id="missionsList">
+                <!-- Injected via JS -->
+            </div>
+            <button class="btn-back" id="missionsBack">KEMBALI</button>
+        </div>
+
+        <!-- ACHIEVEMENTS SCREEN -->
+        <div class="modal panel-screen" id="achievementsScreen" style="display:none;">
+            <div class="panel-header"><h2>ACHIEVEMENTS</h2></div>
+            <div class="panel-content scrollable" id="achievementsList">
+                <!-- Injected via JS -->
+            </div>
+            <button class="btn-back" id="achievementsBack">KEMBALI</button>
+        </div>
+
+        <!-- STATS SCREEN -->
+        <div class="modal panel-screen" id="statsScreen" style="display:none;">
+            <div class="panel-header"><h2>STATISTICS</h2></div>
+            <div class="panel-content scrollable" id="statsContent" style="padding: 10px;">
+                <!-- Injected via JS -->
+            </div>
+            <button class="btn-back" id="statsBack">KEMBALI</button>
+        </div>
+
+        
+        <!-- UPGRADES SCREEN -->
+        <div class="modal panel-screen" id="upgradesScreen" style="display:none;">
+            <div class="panel-header"><h2>UPGRADES</h2></div>
+            <div class="panel-content scrollable">
+                <div class="currency-row" style="display:flex; justify-content:space-between; margin-bottom:15px; font-weight:800;">
+                    <div class="currency-item" style="display:flex; align-items:center;"><svg class="icon-sm" viewBox="0 0 24 24" fill="#fbbf24" stroke="#d97706" stroke-width="2" style="width:18px;height:18px;margin-right:5px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg><span id="upgCoinDisplay">0</span></div>
+<div class="currency-item" style="color:#059669; display:flex; align-items:center;"><svg class="icon-sm" viewBox="0 0 24 24" fill="#34d399" stroke="#059669" stroke-width="2" style="width:18px;height:18px;margin-right:5px;"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon></svg><span id="upgGemDisplay">0</span></div>
+                </div>
+                <div class="color-row" id="upgradesList" style="flex-direction:column; gap:10px;">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+            <button class="btn-back" id="upgradesBack">KEMBALI</button>
+        </div>
+
+        <!-- SETTINGS SCREEN -->
+        <div class="modal panel-screen" id="settingsScreen" style="display:none;">
+            <div class="panel-header"><h2>SETTINGS</h2></div>
+            <div class="panel-content" style="text-align: center;">
+                <p style="font-weight: 700; color: #475569; margin-bottom: 20px;">Sesuaikan profil atau ganti akun.</p>
+                
+                <button class="btn-primary" id="btnChangeProfile" style="margin-bottom: 10px; background: linear-gradient(135deg, #f59e0b, #d97706); border-color: #b45309; box-shadow: 0 4px 0 #b45309;">
+                    GANTI NAMA
+                </button>
+
+                <button class="btn-primary" id="btnLogout" style="background: linear-gradient(135deg, #ef4444, #dc2626); border-color: #991b1b; box-shadow: 0 4px 0 #991b1b;">
+                    LOGOUT
+                </button>
+            </div>
+            <button class="btn-back" id="settingsBack">KEMBALI</button>
+        </div>
+
+        <!-- GAME OVER SCREEN -->
+        <div class="modal panel-screen" id="gameOverScreen" style="display:none; border: none; border-radius: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+            <div style="background: linear-gradient(135deg, #334155, #0f172a); padding: 30px 20px; text-align: center; border-radius: 20px 20px 0 0; position: relative; overflow: hidden;">
+                <div style="position: absolute; top: -10px; right: -10px; opacity: 0.15; transform: rotate(15deg);">
+                    <svg width="100" height="100" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 22h20L12 2z"/></svg>
+                </div>
+                <h2 style="color: white; font-size: 2.5rem; font-weight: 900; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.3); font-family: 'Patrick Hand', cursive; position: relative; z-index: 1;">GAME OVER!</h2>
+            </div>
+            <div class="panel-content" style="padding: 30px 20px; background: white; text-align: center; flex: none;">
+                <p style="color:#64748b; font-weight:800; margin-bottom:5px; text-transform:uppercase; letter-spacing:1.5px; font-size:0.85rem;">Skor Akhir</p>
+                <h3 style="font-size: 4rem; color:#0f172a; font-weight:900; margin-bottom:20px; line-height:1; font-family: 'Patrick Hand', cursive;" id="goScore">0m</h3>
+                
+                <div style="background:#f8fafc; border: 2px solid #e2e8f0; border-radius: 16px; padding: 15px; margin-bottom: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <p style="color:#94a3b8; font-weight:800; font-size:0.8rem; margin-bottom:5px; text-transform:uppercase; letter-spacing:1px;">Koin Terkumpul</p>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="#f59e0b"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v12M8 10h8M8 14h8" stroke="white" stroke-width="2" stroke-linecap="round"></path></svg>
+                        <p style="color:#f59e0b; font-weight:900; font-size:1.8rem; line-height:1;">+<span id="goCoins">0</span></p>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+                    <button class="btn-primary" id="btnRevive" style="background: linear-gradient(135deg, #10b981, #059669); border-color: #047857; box-shadow: 0 4px 0 #047857; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; font-size: 1.1rem; padding: 16px;">
+                        <svg class="icon-sm" viewBox="0 0 24 24" fill="#a7f3d0" stroke="#047857" stroke-width="2" style="width:20px;height:20px;"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon></svg> 1 BANGKIT
+                    </button>
+                    <button class="btn-primary" id="btnPlayAgain" style="width: 100%; background: linear-gradient(135deg, #3b82f6, #2563eb); border-color: #1d4ed8; box-shadow: 0 4px 0 #1d4ed8; font-size: 1.1rem; padding: 16px;">
+                        MAIN LAGI
+                    </button>
+                </div>
+            </div>
+            <button class="btn-back" id="btnGoMenu" style="background: #f1f5f9; border-top: 2px solid #e2e8f0; color: #64748b; font-size: 1rem; padding: 18px; border-radius: 0 0 20px 20px;">MENU UTAMA</button>
+        </div>
+    </div>
+
+    <!-- Floating Chat -->
+    <div id="chatFab" style="display:none;">
+        <div id="chatPopup">
+            <div class="qc-grid" id="qcGrid">
+                <button class="qc-btn">Halo semua!</button>
+                <button class="qc-btn">Ayo naik!</button>
+                <button class="qc-btn">Sabar :)</button>
+                <button class="qc-btn">AAAAAA!</button>
+                <button class="qc-btn">Makasih!</button>
+                <button class="qc-btn">Aduh!</button>
+            </div>
+            <div id="chatInputRow">
+                <input type="text" id="chatTxt" placeholder="Ketik pesan..." maxlength="25">
+                <button id="chatSend"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+            </div>
+        </div>
+        <button id="chatFabBtn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1e293b" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
+    </div>
+
+    <!-- Touch Zones -->
+    <div id="touchZone">
+        <div id="tzJ"></div>
+        <div class="tz" id="tzL"></div>
+        <div class="tz" id="tzR"></div>
+    </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/constants.js"></script>
+<script src="js/state.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/leaderboard.js"></script>
+<script src="js/map/platform.js"></script>
+<script src="js/map/objects.js"></script>
+<script src="js/map/generator.js"></script>
+<script src="js/player/CharacterManager.js"></script>
+<script src="js/player/character.js"></script>
+<script src="js/player/actions.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/multiplayer.js"></script>
+<script src="js/input.js"></script>
+<script src="js/chat.js"></script>
+<script src="js/menu.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
