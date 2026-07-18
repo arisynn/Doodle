@@ -17,15 +17,21 @@
         const manifest = {
             name: "Doodle MMO",
             short_name: "DoodleMMO",
-            start_url: ".",
+            start_url: "/",
             display: "standalone",
             background_color: "#475569",
             theme_color: "#475569",
             icons: [
                 {
-                    src: "logo.svg",
+                    src: "/logo192.png",
                     sizes: "192x192",
-                    type: "image/svg+xml",
+                    type: "image/png",
+                    purpose: "any maskable"
+                },
+                {
+                    src: "/logo512.png",
+                    sizes: "512x512",
+                    type: "image/png",
                     purpose: "any maskable"
                 }
             ]
@@ -214,6 +220,7 @@
         });
     </script>
 
+    <link rel="apple-touch-icon" href="/logo.png">
 </head>
 <body>
 

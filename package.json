@@ -5,12 +5,13 @@
   "main": "server.js",
   "scripts": {
     "dev": "node server.js",
-    "build": "mkdir -p public && cp index.html public/",
+    "build": "mkdir -p public && cp index.html manifest.json sw.js logo.png public/",
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
     "image-size": "^2.0.2",
-    "jsdom": "^29.1.1"
+    "jsdom": "^29.1.1",
+    "sharp": "^0.35.3"
   }
 }

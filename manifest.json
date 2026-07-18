@@ -1,0 +1,16 @@
+{
+  "name": "Doodle MMO",
+  "short_name": "DoodleMMO",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#475569",
+  "theme_color": "#475569",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
