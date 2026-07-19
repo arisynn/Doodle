@@ -21,7 +21,10 @@ class CharacterManager {
     loadSkin(skinId) {
         this.selectedSkin = skinId;
         localStorage.setItem('doodle_skin', skinId);
-        const states = ['idle', 'jump', 'land', 'fly'];
+        
+        // Di sini kita tambahkan 'idleblink' ke dalam daftar gambar yang harus dimuat
+        const states = ['idle', 'idleblink', 'jump', 'land', 'fly'];
+        
         this.sprites = {};
         for (let state of states) {
             let img = new Image();
@@ -34,10 +37,11 @@ class CharacterManager {
         }
     }
 
-    
     getSprite(state, skinId) {
+        // Jika tidak ada skinId khusus, gunakan skin yang sedang dipakai pemain
         if (!skinId || skinId === this.selectedSkin) return this.sprites[state];
         
+        // Caching sistem untuk skin teman (jika gamenya multiplayer/ada sistem peer)
         this.peerCache = this.peerCache || {};
         if (!this.peerCache[skinId]) this.peerCache[skinId] = {};
         
@@ -49,7 +53,6 @@ class CharacterManager {
         }
         return this.peerCache[skinId][state];
     }
-
 }
 
 window.characterManager = new CharacterManager();

@@ -53,6 +53,14 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
         state = 'jump';
     }
 
+    // Logika berkedip (Blink) khusus saat sedang diam (idle)
+    if (state === 'idle') {
+        let blinkCycle = Date.now() % 4000; // Siklus tiap 4 detik (4000 milidetik)
+        if (blinkCycle < 150) { // Karakter menutup mata hanya selama 150 milidetik
+            state = 'idleblink';
+        }
+    }
+
     let sprite = null;
     if (window.characterManager) {
         sprite = window.characterManager.getSprite(state, skinId);
