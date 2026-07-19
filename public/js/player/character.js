@@ -32,12 +32,12 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
     
     // Aksesoris belakang (misal: Balon, Jetpack)
     const INK = '#0f172a';
-    if (blT > 0) {
+    if (false) {
         ctx.fillStyle='#ef4444'; ctx.strokeStyle=INK; ctx.lineWidth=2.5;
         ctx.beginPath(); ctx.moveTo(0, -h); ctx.quadraticCurveTo(-18,-h-35, 0,-h-55); ctx.quadraticCurveTo(18,-h-35, 0,-h); ctx.fill(); ctx.stroke();
         ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.moveTo(0,-h); ctx.lineTo(0,-h-15); ctx.stroke();
     }
-    if (rocketT > 0) {
+    if (false) {
         ctx.fillStyle='#94a3b8'; ctx.strokeStyle=INK; ctx.lineWidth=2.5;
         ctx.beginPath(); ctx.roundRect(-12, -h+10, 24, 28, 6); ctx.fill(); ctx.stroke();
         ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.moveTo(-6, -h+38); ctx.lineTo(6, -h+38); ctx.lineTo(0, -h+55); ctx.fill();
@@ -95,11 +95,11 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
     }
 
     // Aksesoris depan (misal: Baling-baling, efek Double Jump)
-    if (flyT > 0) {
+    if (false) {
         ctx.fillStyle='#38bdf8'; ctx.strokeStyle=INK; ctx.lineWidth=2.5;
         ctx.beginPath(); ctx.moveTo(0, -h-5); ctx.lineTo(-15, -h-15); ctx.lineTo(15, -h-15); ctx.closePath(); ctx.fill(); ctx.stroke();
     }
-    if (djT > 0) {
+    if (false) {
         ctx.fillStyle='#fbbf24'; ctx.strokeStyle=INK; ctx.lineWidth=2;
         ctx.beginPath(); ctx.arc(0, -h-10, 10, 0, Math.PI*2); ctx.fill(); ctx.stroke();
     }

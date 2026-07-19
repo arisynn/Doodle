@@ -15,36 +15,22 @@ class ItemObj {
     constructor(id, x, y, type) { this.id = 'it_'+id; this.x = x; this.y = y-32; this.type = type; this.t = 0; }
     update() { this.t += 0.08; }
     draw() {
-        ctx.save(); ctx.translate(this.x, this.y + Math.sin(this.t)*6); ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.lineJoin='round';
-        if (this.type === 'hat') { // Baling-baling lebih detail
-            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(0,6,15,Math.PI,0); ctx.fill(); ctx.stroke(); // Topi merah
-            ctx.beginPath(); ctx.moveTo(-20,6); ctx.lineTo(20,6); ctx.lineWidth=4.5; ctx.stroke(); // Lidah topi
-            ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,-9); ctx.lineTo(0,-18); ctx.stroke(); // Tiang
-            // Baling-baling muter
-            let spin = Date.now()/50;
-            ctx.fillStyle='#fde047'; ctx.beginPath(); ctx.ellipse(Math.cos(spin)*8, -18, 12, 4, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-            ctx.fillStyle='#3b82f6'; ctx.beginPath(); ctx.ellipse(Math.cos(spin+Math.PI)*8, -18, 12, 4, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        } else if (this.type === 'rocket') { // Jetpack silver
-            ctx.fillStyle = '#94a3b8'; ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(-10,6); ctx.lineTo(10,6); ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(0,-16); ctx.lineTo(-5,-2); ctx.lineTo(5,-2); ctx.fill(); // Tip merah
-            ctx.fillStyle='#cbd5e1'; ctx.beginPath(); ctx.moveTo(-10,6); ctx.lineTo(-14,14); ctx.lineTo(-6,6); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.moveTo(10,6); ctx.lineTo(14,14); ctx.lineTo(6,6); ctx.fill(); ctx.stroke();
-            ctx.fillStyle='#f59e0b'; ctx.beginPath(); ctx.arc(0,6, 4,0,Math.PI*2); ctx.fill(); // Nozzle
-        } else if (this.type === 'dj') { // Sayap emas estetik
-            ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.ellipse(0, 0, 8, 10, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#fff'; 
-            ctx.beginPath(); ctx.ellipse(-14, -2, 10, 4, -0.5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-            ctx.beginPath(); ctx.ellipse(-10, 4, 8, 3, -0.2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-            ctx.beginPath(); ctx.ellipse(14, -2, 10, 4, 0.5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-            ctx.beginPath(); ctx.ellipse(10, 4, 8, 3, 0.2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-        } else if (this.type === 'heart') { // Hati Kristal
-            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(-6, -2, 7, Math.PI, 0); ctx.arc(6, -2, 7, Math.PI, 0); ctx.lineTo(0, 12); ctx.closePath(); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-5, -3, 3, 5, -0.5, 0, Math.PI*2); ctx.fill(); // Highlight
-        } else if (this.type === 'balloon') { // Balon detail
-            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.ellipse(0, -8, 14, 18, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.ellipse(-5, -12, 4, 8, -0.3, 0, Math.PI*2); ctx.fill(); // Highlight
-            ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.moveTo(-3, 10); ctx.lineTo(3, 10); ctx.lineTo(0, 14); ctx.fill(); ctx.stroke();
-            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, 26); ctx.stroke(); // Tali
+        ctx.save(); ctx.translate(this.x, this.y + Math.sin(this.t)*6);
+        let img = new Image();
+        if (this.type === 'hat') img.src = 'assets/powerups/propellerhat.png';
+        else if (this.type === 'superjump') img.src = 'assets/powerups/superjump.png';
+        else if (this.type === 'dj') img.src = 'assets/powerups/doublejump.png';
+        else if (this.type === 'balloon' || this.type === 'slowfall') img.src = 'assets/powerups/slowfall.png';
+        else if (this.type === 'shield') img.src = 'assets/powerups/shield.png';
+        else if (this.type === 'extralife' || this.type === 'heart') img.src = 'assets/powerups/extralife.png';
+        else if (this.type === 'magnet') img.src = 'assets/powerups/magnet.png';
+        
+        
+        
+        if (img.src) {
+            ctx.drawImage(img, -20, -20, 40, 40);
         }
+
         ctx.restore();
     }
 }
@@ -77,6 +63,60 @@ class CoinObj {
         ctx.arc(0, 0, 10, 0, Math.PI*2);
         ctx.fill(); ctx.stroke();
         ctx.fillStyle='#ca8a04'; ctx.font='bold 14px Nunito'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('C', 0, 1);
+        ctx.restore();
+    }
+}
+
+class EnemyObj {
+    constructor(id, x, y) { this.id = 'enemy_'+id; this.x = x; this.y = y-20; this.t = 0; this.type = Math.random() > 0.5 ? 'bat' : 'slime'; this.vx = (Math.random() > 0.5 ? 1 : -1) * 1.5; }
+    update() { 
+        this.t += 0.1; 
+        if (this.type === 'bat') {
+            this.x += this.vx;
+            this.y += Math.sin(this.t) * 2; // hover
+            if (this.x < 0 || this.x > MAP_W) this.vx *= -1;
+        } else {
+            // Slime moves slightly
+            this.x += Math.sin(this.t * 0.5) * 1;
+        }
+    }
+    draw() {
+        ctx.save(); 
+        ctx.translate(this.x, this.y);
+        
+        if (this.type === 'bat') {
+            ctx.fillStyle = '#1e293b'; // dark blue/gray
+            ctx.beginPath();
+            ctx.arc(0, 0, 12, 0, Math.PI*2);
+            ctx.fill();
+            
+            // Wings
+            ctx.fillStyle = '#0f172a';
+            let wingOffset = Math.sin(this.t * 2) * 10;
+            ctx.beginPath();
+            ctx.moveTo(-10, 0); ctx.lineTo(-25, wingOffset); ctx.lineTo(-10, 8); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(10, 0); ctx.lineTo(25, wingOffset); ctx.lineTo(10, 8); ctx.fill();
+            
+            // Eyes
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath(); ctx.arc(-4, -2, 3, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -2, 3, 0, Math.PI*2); ctx.fill();
+        } else {
+            // Slime
+            ctx.fillStyle = '#a3e635'; // light green
+            ctx.scale(1 + Math.sin(this.t)*0.1, 1 - Math.sin(this.t)*0.1);
+            ctx.beginPath();
+            ctx.arc(0, 10, 15, Math.PI, 0); // half circle
+            ctx.closePath();
+            ctx.fill();
+            
+            // Eyes
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath(); ctx.arc(-5, 5, 3, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(5, 5, 3, 0, Math.PI*2); ctx.fill();
+        }
+        
         ctx.restore();
     }
 }

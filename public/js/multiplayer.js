@@ -27,6 +27,9 @@ function connectAbly(name) {
             if (msg.clientId === myId) { p.chatMsg = msg.data.t; p.chatTimer = 160; }
             else if (peers[msg.clientId]) { peers[msg.clientId].chatMsg = msg.data.t; peers[msg.clientId].chatTimer = 160; }
         });
+        chan.subscribe('die', msg => {
+            if (peers[msg.clientId]) delete peers[msg.clientId];
+        });
         chan.presence.enter({ name });
     } catch(e) {}
 }

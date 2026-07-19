@@ -5,7 +5,8 @@ const gemIcon = '<svg class="icon-sm" viewBox="0 0 24 24" fill="#34d399" stroke=
 
 let coins = parseInt(localStorage.getItem('doodle_coins') || '0');
 let playerGems = parseInt(localStorage.getItem('doodle_gems') || '0');
-let powerupLevels = JSON.parse(localStorage.getItem('doodle_powerup_levels') || '{"hat":1, "rocket":1, "dj":1, "balloon":1, "headStart":0, "extraHeart":0}');
+let powerupLevels = JSON.parse(localStorage.getItem('doodle_powerup_levels') || '{"hat":1, "superjump":1, "dj":1, "balloon":1, "shield":1, "magnet":1}');
+let powerupConsumables = JSON.parse(localStorage.getItem('doodle_consumables') || '{"propellerhat":0, "superjump":0, "doublejump":0, "slowfall":0, "extralife":0, "shield":0, "magnet":0}');
 let unlockedItems = JSON.parse(localStorage.getItem('doodle_unlocked') || '["default"]');
 // Ensure default is always there
 if (!unlockedItems.includes('default')) unlockedItems.push('default');
@@ -41,6 +42,7 @@ let unlockedAch = JSON.parse(localStorage.getItem('doodle_ach') || '[]');
 function saveUserData() {
     localStorage.setItem('doodle_gems', playerGems);
     localStorage.setItem('doodle_powerup_levels', JSON.stringify(powerupLevels));
+    localStorage.setItem('doodle_consumables', JSON.stringify(powerupConsumables));
     localStorage.setItem('doodle_coins', coins);
     localStorage.setItem('doodle_unlocked', JSON.stringify(unlockedItems));
     localStorage.setItem('doodle_stats', JSON.stringify(stats));
@@ -60,7 +62,7 @@ function updateUI() {
             if (eq.id === 'default') testUrl = 'assets/player/base/idle.png';
             let tmp = new Image();
             tmp.onload = () => { 
-                mcp.style.backgroundImage = 'url("' + testUrl + '")'; 
+                mcp.style.backgroundImage = 'url("' + testUrl + '")'; mcp.style.backgroundSize = 'contain'; mcp.style.backgroundPosition = 'bottom center'; mcp.style.backgroundRepeat = 'no-repeat'; 
                 mcp.style.backgroundColor = 'transparent';
             };
             tmp.onerror = () => { 
@@ -83,8 +85,8 @@ function updateUI() {
     document.getElementById('dcText').innerText = dailyChallenge.text;
     document.getElementById('dcReward').innerHTML = dailyChallenge.completed ? 'COMPLETED' : 'Reward: ' + dailyChallenge.reward + ' ' + coinIcon;
     let pct = Math.min(100, (dailyChallenge.progress / dailyChallenge.target) * 100);
-    document.getElementById('dcFill').style.width = pct + '%';
-    if(dailyChallenge.completed) document.getElementById('dcFill').style.background = '#10b981';
+    let dcF = document.getElementById('dcFill'); if(dcF) dcF.style.width = pct + '%';
+    if(dailyChallenge.completed) { let dcF2 = document.getElementById('dcFill'); if(dcF2) dcF2.style.background = '#10b981'; }
 
     // Shop UI
     renderShopSelection();
@@ -120,8 +122,8 @@ function updateUI() {
                 img.style.height = '40px';
                 img.style.marginBottom = '5px';
                 img.style.backgroundImage = 'url("' + skin.previewImage + '")';
-                img.style.backgroundSize = '400% 100%';
-                img.style.backgroundPosition = '0% 0%';
+                img.style.backgroundSize = 'contain';
+                img.style.backgroundPosition = 'bottom center';
                 img.style.backgroundRepeat = 'no-repeat';
 
                 
@@ -183,11 +185,11 @@ function updateUI() {
 const screens = {
     login: document.getElementById('loginScreen'),
     main: document.getElementById('mainMenuScreen'),
+    skin: document.getElementById('skinScreen'),
     shop: document.getElementById('shopScreen'),
     missions: document.getElementById('missionsScreen'),
     achievements: document.getElementById('achievementsScreen'),
     settings: document.getElementById('settingsScreen'),
-    stats: document.getElementById('statsScreen'),
     upgrades: document.getElementById('upgradesScreen'),
     gameOver: document.getElementById('gameOverScreen')
 };
@@ -195,23 +197,25 @@ const screens = {
 
 function renderUpgrades() {
     let upgDefs = {
-        'hat': { name: 'Propeller Hat', desc: 'Terbang lebih lama', max: 5, baseCost: 100 },
-        'rocket': { name: 'Jetpack', desc: 'Roket lebih lama', max: 5, baseCost: 150 },
-        'dj': { name: 'Golden Wings', desc: 'Double jump window lebih lama', max: 5, baseCost: 80 },
-        'balloon': { name: 'Balloon', desc: 'Jatuh lambat lebih lama', max: 5, baseCost: 80 },
-        'headStart': { name: 'Head Start', desc: 'Mulai dengan roket super (Passive)', max: 5, baseCost: 200 },
-        'extraHeart': { name: 'Extra Heart', desc: 'Kebal 1x saat kena duri (Passive)', max: 1, baseCost: 500 }
+        'hat': { name: 'Propeller Hat', desc: 'Terbang lebih lama', max: 5, baseCost: 100, icon: 'assets/powerups/propellerhat.png' },
+        'superjump': { name: 'Super Jump', desc: 'Lompatan lebih tinggi', max: 5, baseCost: 150, icon: 'assets/powerups/superjump.png' },
+        'dj': { name: 'Double Jump', desc: 'Lompat dua kali', max: 5, baseCost: 80, icon: 'assets/powerups/doublejump.png' },
+        'balloon': { name: 'Slow Fall', desc: 'Jatuh lambat lebih lama', max: 5, baseCost: 80, icon: 'assets/powerups/slowfall.png' },
+        'shield': { name: 'Shield', desc: 'Kebal lebih lama', max: 5, baseCost: 200, icon: 'assets/powerups/shield.png' },
+        'extralife': { name: 'Extra Life', desc: 'Menghidupkan kembali', max: 5, baseCost: 500, icon: 'assets/powerups/extralife.png' },
+        'magnet': { name: 'Magnet', desc: 'Durasi tarikan koin lebih lama', max: 5, baseCost: 120, icon: 'assets/powerups/magnet.png' }
     };
     
     let html = '';
     for (let k in upgDefs) {
         let def = upgDefs[k];
-        let lvl = powerupLevels[k] || (k==='headStart'||k==='extraHeart' ? 0 : 1);
+        let lvl = powerupLevels[k] || 1;
         let cost = def.baseCost * (lvl + 1);
         let maxed = lvl >= def.max;
         
         html += `
-            <div style="background:#f8fafc; border:2px solid #cbd5e1; border-radius:12px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="background:#f8fafc; border:2px solid #cbd5e1; border-radius:12px; padding:10px; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <img src="${def.icon}" style="width:40px; height:40px; margin-right:15px;" />
                 <div style="flex:1;">
                     <div style="font-weight:800; color:#1e293b; font-size:1.1rem;">${def.name} <span style="color:#059669;">(Lv ${lvl})</span></div>
                     <div style="font-size:0.8rem; color:#64748b; font-weight:700;">${def.desc}</div>
@@ -245,8 +249,8 @@ window.buyUpgrade = function(k, cost) {
 };
 
 function showScreen(name) {
-    for(let k in screens) screens[k].style.display = 'none';
-    screens[name].style.display = 'block';
+    for(let k in screens) { if(screens[k]) screens[k].style.display = 'none'; }
+    if(screens[name]) screens[name].style.display = 'block';
     updateUI();
 }
 
@@ -276,10 +280,10 @@ document.getElementById('loginBtn').onclick = () => {
 document.getElementById('btnPlay').onclick = () => {
     stats.gamesPlayed++;
     saveUserData();
-    document.getElementById('overlay').style.display = 'none';
-    document.getElementById('hudHeader').style.display = 'flex';
-    document.getElementById('chatFab').style.display = 'block';
-    document.getElementById('touchZone').style.display = 'block';
+    var _overlay_display = document.getElementById('overlay'); if(_overlay_display) _overlay_display.style.display = 'none';
+    var _hudHeader_display = document.getElementById('hudHeader'); if(_hudHeader_display) _hudHeader_display.style.display = 'flex';
+    var _chatFab_display = document.getElementById('chatFab'); if(_chatFab_display) _chatFab_display.style.display = 'block';
+    var _touchZone_display = document.getElementById('touchZone'); if(_touchZone_display) _touchZone_display.style.display = 'block';
     
     // Check if Ably is connected, otherwise connect
     if(!window.ablyConnected) {
@@ -290,8 +294,54 @@ document.getElementById('btnPlay').onclick = () => {
     lbFetch();
 };
 
-document.getElementById('btnShop').onclick = () => { showScreen('shop'); };
+document.getElementById('btnShop').onclick = () => { renderPowerupShop(); showScreen('shop'); };
 document.getElementById('shopBack').onclick = () => { showScreen('main'); };
+
+window.buyConsumable = function(k, cost) {
+    if (coins >= cost) {
+        coins -= cost;
+        powerupConsumables[k] = (powerupConsumables[k] || 0) + 1;
+        saveUserData();
+        renderPowerupShop();
+        
+        let scd = document.getElementById('shopCoinDisplay'); if(scd) scd.innerText = coins;
+        let hc = document.getElementById('hudCoinDisplay'); if(hc) hc.innerText = coins;
+    } else {
+        alert("Koin tidak cukup!");
+    }
+};
+
+function renderPowerupShop() {
+    let items = {
+        'propellerhat': { name: 'Propeller Hat', cost: 50, icon: 'assets/powerups/propellerhat.png' },
+        'superjump': { name: 'Super Jump', cost: 75, icon: 'assets/powerups/superjump.png' },
+        'doublejump': { name: 'Double Jump', cost: 40, icon: 'assets/powerups/doublejump.png' },
+        'slowfall': { name: 'Slow Fall', cost: 40, icon: 'assets/powerups/slowfall.png' },
+        'shield': { name: 'Shield', cost: 100, icon: 'assets/powerups/shield.png' },
+        'extralife': { name: 'Extra Life', cost: 250, icon: 'assets/powerups/extralife.png' },
+        'magnet': { name: 'Magnet', cost: 60, icon: 'assets/powerups/magnet.png' }
+    };
+    
+    let html = '';
+    for (let k in items) {
+        let def = items[k];
+        let count = powerupConsumables[k] || 0;
+        
+        html += `
+            <div style="background:#f8fafc; border:2px solid #cbd5e1; border-radius:12px; padding:10px; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <img src="${def.icon}" style="width:40px; height:40px; margin-right:15px;" />
+                <div style="flex:1;">
+                    <div style="font-weight:800; color:#1e293b; font-size:1.1rem;">${def.name}</div>
+                    <div style="font-size:0.8rem; color:#64748b; font-weight:700;">Dimiliki: ${count}</div>
+                </div>
+                <div>
+                    <button class="btn-primary" onclick="buyConsumable('${k}', ${def.cost})" style="padding:5px 10px; font-size:0.9rem; display:flex; align-items:center; justify-content:center; gap:4px;"><svg class="icon-sm" viewBox="0 0 24 24" fill="#fbbf24" stroke="#d97706" stroke-width="2" style="width:14px;height:14px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>${def.cost}</button>
+                </div>
+            </div>
+        `;
+    }
+    document.getElementById('shopItemsList').innerHTML = html;
+}
 
 document.getElementById('btnMissions').onclick = () => { 
     renderMissions(); let hc = document.getElementById('hudCoinDisplay'); if(hc) hc.innerText = coins;
@@ -315,6 +365,7 @@ function renderShopSelection() {
     let buyBtn = document.getElementById('buyBtn');
     let previewImg = document.getElementById('shopBigPreview');
     let nameEl = document.getElementById('shopSkinName');
+    if (!msgArea || !buyBtn || !previewImg || !nameEl) return;
     
     if (!currentShopSkin) {
         if (window.characterManager) {
@@ -338,7 +389,7 @@ function renderShopSelection() {
         imgUrl = skin.previewImage;
     }
     tempImg.onload = () => {
-        previewImg.style.backgroundImage = 'url("' + imgUrl + '")';
+        previewImg.style.backgroundImage = 'url("' + imgUrl + '")'; previewImg.style.backgroundSize = 'contain'; previewImg.style.backgroundPosition = 'bottom center'; previewImg.style.backgroundRepeat = 'no-repeat';
         previewImg.style.backgroundColor = 'transparent';
     };
     tempImg.onerror = () => {
@@ -478,6 +529,7 @@ function renderAchievements() {
 window.addCoins = function(amt) {
     coins += amt;
     saveUserData();
+    let hc = document.getElementById('hudCoinDisplay'); if(hc) hc.innerText = coins;
 };
 window.updateGameStats = function(jumps, maxHeight) {
     stats.totalJumps += jumps;
@@ -518,11 +570,13 @@ window.updateGameStats = function(jumps, maxHeight) {
 document.getElementById('hudMenuBtn').onclick = () => {
     // Return to main menu
     gameState = 'MENU';
-    document.getElementById('overlay').style.display = 'flex';
-    document.getElementById('hudHeader').style.display = 'none';
-    document.getElementById('chatFab').style.display = 'none';
-    document.getElementById('touchZone').style.display = 'none';
-    document.getElementById('hudHeader').style.display = 'none';
+    var _overlay_display = document.getElementById('overlay'); if(_overlay_display) _overlay_display.style.display = 'flex';
+    var _hudHeader_display = document.getElementById('hudHeader'); if(_hudHeader_display) _hudHeader_display.style.display = 'none';
+    var inv = document.getElementById('inventoryBar'); if (inv) inv.style.display = 'none';
+    var _chatFab_display = document.getElementById('chatFab'); if(_chatFab_display) _chatFab_display.style.display = 'none';
+    var _touchZone_display = document.getElementById('touchZone'); if(_touchZone_display) _touchZone_display.style.display = 'none';
+    var _hudHeader_display = document.getElementById('hudHeader'); if(_hudHeader_display) _hudHeader_display.style.display = 'none';
+    var inv = document.getElementById('inventoryBar'); if (inv) inv.style.display = 'none';
     
     // Save state if needed
     if(window.updateGameStats) {
@@ -550,46 +604,12 @@ document.getElementById('btnChangeProfile').onclick = () => {
 };
 
 // Update character preview
-function updateCharPreview() {
-    let p = document.getElementById('menuCharPreview');
-    p.style.background = playerType === 'ninja' ? '#1e293b' : playerColor;
-    p.style.color = playerType === 'ninja' ? '#fff' : '#1e293b';
-    if (playerType === 'doodle') { p.innerText = 'D'; p.style.borderRadius = '12px'; }
-    if (playerType === 'jelly') { p.innerText = 'J'; p.style.borderRadius = '8px'; }
-    if (playerType === 'slime') { p.innerText = 'S'; p.style.borderRadius = '50% 50% 12px 12px'; }
-    if (playerType === 'ghost') { p.innerText = 'G'; p.style.borderRadius = '50% 50% 50% 50%'; }
-    if (playerType === 'ninja') { p.innerText = 'N'; p.style.borderRadius = '8px'; }
-}
-const oldUpdateUI = updateUI;
-updateUI = function() {
-    oldUpdateUI();
-    updateCharPreview();
-};
+
 
 // ── STATS & DAILY REWARD ──
 
-document.getElementById('btnStats').onclick = () => {
-    document.getElementById('statsContent').innerHTML = `
-        <div class="list-item">
-            <div class="list-info"><h4>Total Dimainkan</h4></div>
-            <div class="list-reward" style="color:#2563eb;">${stats.gamesPlayed} x</div>
-        </div>
-        <div class="list-item">
-            <div class="list-info"><h4>Total Lompatan</h4></div>
-            <div class="list-reward" style="color:#2563eb;">${stats.totalJumps} x</div>
-        </div>
-        <div class="list-item">
-            <div class="list-info"><h4>Rekor Tertinggi</h4></div>
-            <div class="list-reward" style="color:#2563eb;">${stats.maxHeight}m</div>
-        </div>
-        <div class="list-item">
-            <div class="list-info"><h4>Total Koin Dikumpulkan</h4></div>
-            <div class="list-reward" style="color:#2563eb;">${coins} Coins</div>
-        </div>
-    `;
-    showScreen('stats');
-};
-document.getElementById('statsBack').onclick = () => { showScreen('main'); };
+document.getElementById('btnSkin').onclick = () => { showScreen('skin'); };
+document.getElementById('skinBack').onclick = () => { showScreen('main'); };
 
 document.getElementById('btnUpgrades').onclick = () => { renderUpgrades(); showScreen('upgrades'); };
 document.getElementById('upgradesBack').onclick = () => { showScreen('main'); };
@@ -598,18 +618,24 @@ document.getElementById('upgradesBack').onclick = () => { showScreen('main'); };
 
 // ── GAME OVER ──
 window.showGameOver = function(score, earnedCoins) {
+    if (typeof chan !== 'undefined' && chan) chan.publish('die', {});
     gameState = 'GAMEOVER';
-    document.getElementById('overlay').style.display = 'flex';
-    document.getElementById('hudHeader').style.display = 'none';
-    document.getElementById('chatFab').style.display = 'none';
-    document.getElementById('touchZone').style.display = 'none';
+    var _overlay_display = document.getElementById('overlay'); if(_overlay_display) _overlay_display.style.display = 'flex';
+    var _hudHeader_display = document.getElementById('hudHeader'); if(_hudHeader_display) _hudHeader_display.style.display = 'none';
+    var inv = document.getElementById('inventoryBar'); if (inv) inv.style.display = 'none';
+    var _chatFab_display = document.getElementById('chatFab'); if(_chatFab_display) _chatFab_display.style.display = 'none';
+    var _touchZone_display = document.getElementById('touchZone'); if(_touchZone_display) _touchZone_display.style.display = 'none';
     
     document.getElementById('goScore').innerText = Math.floor(score) + 'm';
     document.getElementById('goCoins').innerText = earnedCoins;
     
     let btnRevive = document.getElementById('btnRevive');
-    if (playerGems >= 1) {
+    let hasExtraLife = powerupConsumables['extralife'] > 0;
+    if (!btnRevive) return;
+    
+    if (hasExtraLife || playerGems >= 1) {
         btnRevive.style.display = 'flex';
+        btnRevive.innerHTML = hasExtraLife ? '<img src="assets/powerups/extralife.png" style="width:20px;height:20px;"> 1 EXTRA LIFE' : '<svg class="icon-sm" viewBox="0 0 24 24" fill="#a7f3d0" stroke="#047857" stroke-width="2" style="width:20px;height:20px;"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon></svg> 1 GEM';
     } else {
         btnRevive.style.display = 'none';
     }
@@ -620,10 +646,10 @@ window.showGameOver = function(score, earnedCoins) {
 document.getElementById('btnPlayAgain').onclick = () => {
     stats.gamesPlayed++;
     saveUserData();
-    document.getElementById('overlay').style.display = 'none';
-    document.getElementById('hudHeader').style.display = 'flex';
-    document.getElementById('chatFab').style.display = 'block';
-    document.getElementById('touchZone').style.display = 'block';
+    var _overlay_display = document.getElementById('overlay'); if(_overlay_display) _overlay_display.style.display = 'none';
+    var _hudHeader_display = document.getElementById('hudHeader'); if(_hudHeader_display) _hudHeader_display.style.display = 'flex';
+    var _chatFab_display = document.getElementById('chatFab'); if(_chatFab_display) _chatFab_display.style.display = 'block';
+    var _touchZone_display = document.getElementById('touchZone'); if(_touchZone_display) _touchZone_display.style.display = 'block';
     resetGame();
 };
 
@@ -633,27 +659,32 @@ document.getElementById('btnGoMenu').onclick = () => {
 };
 
 document.getElementById('btnRevive').onclick = () => {
-    if (playerGems >= 1) {
-        playerGems -= 1;
+    let hasExtraLife = powerupConsumables['extralife'] > 0;
+    if (hasExtraLife || playerGems >= 1) {
+        if (hasExtraLife) {
+            powerupConsumables['extralife'] -= 1;
+        } else {
+            playerGems -= 1;
+        }
         saveUserData();
         
         // Revive logic
         gameState = 'PLAY';
-        document.getElementById('overlay').style.display = 'none';
-        document.getElementById('hudHeader').style.display = 'flex';
-        document.getElementById('chatFab').style.display = 'block';
-        document.getElementById('touchZone').style.display = 'block';
+        var _overlay_display = document.getElementById('overlay'); if(_overlay_display) _overlay_display.style.display = 'none';
+        var _hudHeader_display = document.getElementById('hudHeader'); if(_hudHeader_display) _hudHeader_display.style.display = 'flex';
+        var _chatFab_display = document.getElementById('chatFab'); if(_chatFab_display) _chatFab_display.style.display = 'block';
+        var _touchZone_display = document.getElementById('touchZone'); if(_touchZone_display) _touchZone_display.style.display = 'block';
         
         p.isIdle = false;
         p.isFreeFalling = false;
         p.hasDJ = false;
-        p.vy = ROCKET_FORCE; 
+        p.vy = -30; // ROCKET_FORCE equivalent
         p.y = camY + H + 20;
-        p.rocketTimer = 250;
+        p.flyTimer = 150; // Give some invulnerability/boost
         
         spawnParticles(p.x, p.y + 20, '#f97316', 40);
         triggerScreenShake();
     } else {
-        alert("Gems tidak cukup!");
+        alert("Gems atau Extra Life tidak cukup!");
     }
 };

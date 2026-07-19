@@ -5,7 +5,7 @@ function resetGame() {
     currentRunJumps = 0;
     rewardedCoinsThisRun = 0;
     p.vy = JUMP_FORCE; p.vx = 0;
-    p.flyTimer=0; p.rocketTimer=0; p.djTimer=0; p.balloonTimer=0; p.hurtTimer=0;
+    p.flyTimer=0;  p.djTimer=0; p.balloonTimer=0; p.hurtTimer=0; p.magnetTimer=0;
     p.hasDJ=false; p.hasHeart=false;
     p.scaleX=1; p.scaleY=1; p.isIdle=false; p.currentPlatform=null; p.facing='right'; 
     p.platOffsetX = 0; p.isFreeFalling = false;
@@ -17,26 +17,16 @@ function resetGame() {
     
     buildMap(); 
     document.getElementById('scoreVal').textContent = Math.floor(displayScore) + 'm';
-    document.getElementById('powerBar').style.display = 'none';
+    let pb = document.getElementById('powerBar'); if(pb) pb.style.display = 'none';
     gameState = 'PLAY';
-    document.getElementById('hudHeader').style.display = 'flex';
+    let hh = document.getElementById('hudHeader'); if(hh) hh.style.display = 'flex';
     
     // Apply Powerups if owned
     
-    let hsLevel = powerupLevels && powerupLevels.headStart ? powerupLevels.headStart : 0;
-    if (hsLevel > 0) {
-        p.rocketTimer = 250 + (hsLevel * 50);
-        p.vy = ROCKET_FORCE;
-        spawnParticles(p.x, p.y + 20, '#f97316', 30);
-    }
     
-    let ehLevel = powerupLevels && powerupLevels.extraHeart ? powerupLevels.extraHeart : 0;
-    if (ehLevel > 0) {
-        p.hasHeart = true;
-    }
 
     // Update local storage and UI
-    saveUserData();
+    if (window.renderInventoryBar) renderInventoryBar(); saveUserData();
 
 }
 
@@ -69,3 +59,68 @@ function triggerScreenShake() {
     void gc.offsetWidth; 
     gc.classList.add('shake-effect');
 }
+
+window.renderInventoryBar = function() {
+    let inv = document.getElementById('inventoryBar');
+    if (!inv) return;
+    
+    let html = '';
+    let hasItems = false;
+    let icons = {
+        'propellerhat': 'assets/powerups/propellerhat.png',
+        'superjump': 'assets/powerups/superjump.png',
+        'doublejump': 'assets/powerups/doublejump.png',
+        'slowfall': 'assets/powerups/slowfall.png',
+        'shield': 'assets/powerups/shield.png',
+        'magnet': 'assets/powerups/magnet.png'
+    };
+    
+    for (let k in icons) {
+        let count = powerupConsumables[k] || 0;
+        if (count > 0) {
+            hasItems = true;
+            html += `<div style="position:relative; width:45px; height:45px; cursor:pointer;" onclick="useConsumable('${k}')" ontouchstart="useConsumable('${k}')">
+                <img src="${icons[k]}" style="width:100%; height:100%;">
+                <div style="position:absolute; bottom:-5px; right:-5px; background:#ef4444; color:white; font-size:12px; font-weight:bold; width:20px; height:20px; border-radius:10px; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.3);">${count}</div>
+            </div>`;
+        }
+    }
+    
+    inv.innerHTML = html;
+    if (gameState === 'PLAY' && hasItems) {
+        inv.style.display = 'flex';
+    } else {
+        inv.style.display = 'none';
+    }
+};
+
+window.useConsumable = function(key) {
+    if (gameState !== 'PLAY') return;
+    if (!powerupConsumables[key] || powerupConsumables[key] <= 0) return;
+    
+    powerupConsumables[key]--;
+    saveUserData();
+    renderInventoryBar();
+    
+    if (key === 'propellerhat') {
+        p.flyTimer = 250; p.vy = FLY_FORCE;
+        spawnParticles(p.x, p.y + 20, '#38bdf8', 30);
+        floatText(p.x, p.y, 'PROPELLER HAT!', '#38bdf8');
+    } else if (key === 'superjump') {
+        p.starCharges += 3;
+        floatText(p.x, p.y, 'SUPER JUMP!', '#fbbf24');
+    } else if (key === 'doublejump') {
+        p.djTimer = 400; p.hasDJ = true;
+        floatText(p.x, p.y, 'DOUBLE JUMP!', '#60a5fa');
+    } else if (key === 'slowfall') {
+        p.balloonTimer = 500;
+        floatText(p.x, p.y, 'SLOW FALL!', '#ef4444');
+    } else if (key === 'shield') {
+        p.hurtTimer = 600;
+        floatText(p.x, p.y, 'SHIELD!', '#a855f7');
+    } else if (key === 'magnet') {
+        p.magnetTimer = 800;
+        floatText(p.x, p.y, 'MAGNET!', '#f43f5e');
+    }
+    triggerScreenShake();
+};

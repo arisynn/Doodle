@@ -4,17 +4,15 @@ function mulberry32(seed) { return function() { let t = seed += 0x6D2B79F5; t = 
 function getLevelData(lvl) {
     let d = new Date();
     // Format YYYYMMDD, contoh: 20260620 (20 Juni 2026)
-    let dailySeed = d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); 
+    let hourlySeed = d.getFullYear() * 1000000 + (d.getMonth() + 1) * 10000 + d.getDate() * 100 + d.getHours(); 
     
-    // SISTEM PINTAR: Khusus tanggal hari ini (saat lomba berlangsung) atau sebelumnya, map dipaksa persis spt semula (13337).
-    // Besok hari pas ganti tanggal jam 00:00 (dan seterusnya), map otomatis ganti mengikuti dailySeed tiap harinya.
-    let seedToUse = (dailySeed <= 20260620) ? 13337 : dailySeed;
+    let seedToUse = hourlySeed;
 
     let rng = mulberry32(lvl * 7919 + seedToUse);
     
     let r1 = rng(), r2 = rng(), r3 = rng(), r4 = rng();
     
-    let pw = 45 + r1 * 60; 
+    let pw = 55 + r1 * 60; 
     let safeWidth = MAP_W - pw - 20;
     let px = 10 + Math.floor(r2 * safeWidth); 
     
@@ -80,39 +78,43 @@ function generateLevel(lvl) {
         }
     }
 
-    let item = null, hasStar = false, hasGem = false;
+    let item = null, hasGem = false, hasCoin = false, hasEnemy = false;
     let r_item = d.rng();
     
     if (type !== 'updown') {
-        if (['normal', 'moving', 'icy', 'conveyor'].includes(type) && lvl > 5 && r_item > 0.92) {
+        if (['normal', 'moving', 'icy', 'conveyor'].includes(type) && lvl > 5 && r_item > 0.90) {
             let r_which = d.rng();
-            if (r_which > 0.8) item = 'rocket';
-            else if (r_which > 0.6) item = 'hat';
-            else if (r_which > 0.4) item = 'dj'; 
-            else if (r_which > 0.2) item = 'heart'; 
-            else item = 'balloon';
-        } else if (r_item < 0.03) {
+            if (r_which > 0.85) item = 'superjump';
+            else if (r_which > 0.7) item = 'hat';
+            else if (r_which > 0.55) item = 'dj'; 
+            else if (r_which > 0.4) item = 'extralife'; 
+            else if (r_which > 0.25) item = 'shield';
+            else if (r_which > 0.1) item = 'magnet';
+            else item = 'slowfall';
+        } else if (lvl > 10 && r_item > 0.85 && r_item <= 0.90) {
+            hasEnemy = true;
+        } else if (r_item < 0.05) {
             hasGem = true;
-        } else if (r_item < 0.08) {
-            hasStar = true; 
+        } else if (r_item < 0.35) {
+            hasCoin = true;
         }
     }
 
     let speed = 1.5 + d.rng() * 1.5;
     let dir = d.rng() > 0.5 ? 1 : -1;
 
-    return { type, x: d.px, y: GROUND_Y - lvl * PLAT_GAP, w: d.pw, item, hasStar, hasGem, baseX: d.px, speed, dir };
+    return { type, x: d.px, y: GROUND_Y - lvl * PLAT_GAP, w: d.pw, item, hasGem, hasCoin, hasEnemy, baseX: d.px, speed, dir };
 }
 
 function buildMap() { 
-    platforms.clear(); stars.clear(); items.clear(); gemMap.clear(); coinsMap.clear(); 
+    platforms.clear(); items.clear(); gemMap.clear(); coinsMap.clear(); enemiesMap.clear(); 
     let topLvl = Math.floor((GROUND_Y - camY + H) / PLAT_GAP) + 20;
     let botLvl = Math.max(0, Math.floor((GROUND_Y - (camY+H)) / PLAT_GAP) - 5);
     for (let i=botLvl; i <= topLvl; i++) {
         let l = generateLevel(i);
         if (l) {
             let pl = new Platform(i, l); pl.w = l.w; pl.baseX = l.x; platforms.set(i, pl);
-            if (l.hasStar) stars.set(i, new StarObj(i, l.x + l.w/2, l.y)); if (l.hasCoin) coinsMap.set(i, new CoinObj(i, l.x + l.w/2, l.y)); if (l.hasGem) gemMap.set(i, new GemObj(i, l.x + l.w/2, l.y)); if (l.item) items.set(i, new ItemObj(i, l.x + l.w/2, l.y, l.item));
+             if (l.hasCoin) coinsMap.set(i, new CoinObj(i, l.x + l.w/2, l.y)); if (l.hasEnemy) enemiesMap.set(i, new EnemyObj(i, l.x + l.w/2, l.y)); if (l.hasGem) gemMap.set(i, new GemObj(i, l.x + l.w/2, l.y)); if (l.item) items.set(i, new ItemObj(i, l.x + l.w/2, l.y, l.item));
 
         }
     }
@@ -123,7 +125,7 @@ function initLevel(lvl) {
     let l = generateLevel(lvl); 
     if (l) {
         let pl = new Platform(lvl, l); pl.w = l.w; pl.baseX = l.x; platforms.set(lvl, pl);
-        if (l.hasStar) stars.set(lvl, new StarObj(lvl, l.x + l.w/2, l.y)); if (l.hasCoin) coinsMap.set(lvl, new CoinObj(lvl, l.x + l.w/2, l.y)); if (l.hasGem) gemMap.set(lvl, new GemObj(lvl, l.x + l.w/2, l.y)); if (l.item) items.set(lvl, new ItemObj(lvl, l.x + l.w/2, l.y, l.item));
+         if (l.hasCoin) coinsMap.set(lvl, new CoinObj(lvl, l.x + l.w/2, l.y)); if (l.hasEnemy) enemiesMap.set(lvl, new EnemyObj(lvl, l.x + l.w/2, l.y)); if (l.hasGem) gemMap.set(lvl, new GemObj(lvl, l.x + l.w/2, l.y)); if (l.item) items.set(lvl, new ItemObj(lvl, l.x + l.w/2, l.y, l.item));
 
     }
 }

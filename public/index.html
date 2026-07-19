@@ -182,32 +182,8 @@
             const gameContainer = document.getElementById('gameContainer');
             if (!guard) return;
             
-            if (checkStandalone()) {
-                guard.style.display = 'none';
-                if(gameContainer) gameContainer.style.display = 'block';
-            } else {
-                guard.style.display = 'flex';
-                if(gameContainer) gameContainer.style.display = 'none';
-                
-                const btnContainer = document.getElementById('pwaBtnContainer');
-                const manualContainer = document.getElementById('pwaManualContainer');
-                
-                if (deferredPrompt) {
-                    btnContainer.style.display = 'block';
-                    manualContainer.style.display = 'none';
-                } else {
-                    btnContainer.style.display = 'none';
-                    manualContainer.style.display = 'block';
-                    
-                    // Basic OS detection for manual instructions
-                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-                    if(isIOS) {
-                         document.getElementById('pwaOsInstruction').innerHTML = 'Ketuk ikon <b>Share</b> <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg> di bawah, lalu pilih <b>"Add to Home Screen"</b> <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>';
-                    } else {
-                         document.getElementById('pwaOsInstruction').innerHTML = 'Ketuk menu titik tiga <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg> di browser, lalu pilih <b>"Install app"</b> atau <b>"Add to Home screen"</b>.';
-                    }
-                }
-            }
+            guard.style.display = 'none';
+            if(gameContainer) gameContainer.style.display = 'block';
         }
         
         window.addEventListener('DOMContentLoaded', () => {
@@ -268,14 +244,7 @@
     </div>
     <script>
     (function() {
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-        // Comment out next line for dev testing if needed
-        if (!isStandalone) {
-            document.addEventListener('DOMContentLoaded', () => {
-                document.getElementById('pwaInstallPrompt').style.display = 'flex';
-                document.getElementById('gameContainer').style.display = 'none';
-            });
-        }
+        const isStandalone = true;
     })();
     </script>
 
@@ -283,6 +252,7 @@
     <div class="bg-grid"></div>
     <canvas id="gc"></canvas>    <!-- HUD -->
     <div id="hudLayer">
+        <div id="inventoryBar" style="display:none; position:absolute; bottom:80px; left:50%; transform:translateX(-50%); gap:10px; background:rgba(30,41,59,0.8); padding:10px 15px; border-radius:30px; z-index:50; pointer-events:auto; display:none; flex-direction:row;"></div>
         <div class="hud-header" id="hudHeader" style="display:none; width: 100%;">
             <!-- LEFT PANEL: Menu & Score -->
             <div class="hud-pill" style="display:flex; align-items:center; gap:8px;">
@@ -397,15 +367,15 @@
                 <button class="btn-menu" id="btnShop">SHOP</button>
                 <button class="btn-menu" id="btnMissions">MISSIONS</button>
                 <button class="btn-menu" id="btnAchievements">ACHIEVEMENTS</button>
-                <button class="btn-menu" id="btnStats">STATS</button>
+                <button class="btn-menu" id="btnSkin">SKINS</button>
                 <button class="btn-menu" id="btnUpgrades" style="grid-column: span 2; background: linear-gradient(135deg, #e0e7ff, #c7d2fe); border-color: #818cf8;">UPGRADES</button>
             </div>
         </div>
 
         <!-- SHOP SCREEN -->
-        <div class="modal panel-screen" id="shopScreen" style="display:none;">
+        <div class="modal panel-screen" id="skinScreen" style="display:none;">
             <div class="panel-header">
-                <h2>SHOP</h2>
+                <h2>SKINS</h2>
                 <div style="display:flex; gap:10px;">
     <div class="currency-item" style="display:flex; align-items:center;"><svg class="icon-sm" viewBox="0 0 24 24" fill="#fbbf24" stroke="#d97706" stroke-width="2" style="width:18px;height:18px;margin-right:5px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg><span id="shopCoinDisplay">0</span></div>
 <div class="currency-item" style="color:#059669; display:flex; align-items:center;"><svg class="icon-sm" viewBox="0 0 24 24" fill="#34d399" stroke="#059669" stroke-width="2" style="width:18px;height:18px;margin-right:5px;"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon></svg><span id="shopGemDisplay">0</span></div>
@@ -453,7 +423,7 @@
                     </div>
                 </div>
             </div>
-            <button class="btn-back" id="shopBack">KEMBALI</button>
+            <button class="btn-back" id="skinBack">KEMBALI</button>
         </div>
 
         <!-- MISSIONS SCREEN -->
@@ -474,13 +444,13 @@
             <button class="btn-back" id="achievementsBack">KEMBALI</button>
         </div>
 
-        <!-- STATS SCREEN -->
-        <div class="modal panel-screen" id="statsScreen" style="display:none;">
-            <div class="panel-header"><h2>STATISTICS</h2></div>
-            <div class="panel-content scrollable" id="statsContent" style="padding: 10px;">
+        <!-- SHOP SCREEN -->
+        <div class="modal panel-screen" id="shopScreen" style="display:none;">
+            <div class="panel-header"><h2>POWER-UP SHOP</h2></div>
+            <div class="panel-content scrollable" id="shopItemsList" style="padding: 10px;">
                 <!-- Injected via JS -->
             </div>
-            <button class="btn-back" id="statsBack">KEMBALI</button>
+            <button class="btn-back" id="shopBack">KEMBALI</button>
         </div>
 
         

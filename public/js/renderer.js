@@ -24,7 +24,7 @@ function loop() {
     let r2 = Math.floor(248 - (248 - 30) * heightRatio); 
     let g2 = Math.floor(250 - (250 - 27) * heightRatio);
     let b2 = Math.floor(252 - (252 - 75) * heightRatio);
-    document.getElementById('gameContainer').style.background = `linear-gradient(180deg, rgb(${r1},${g1},${b1}) 0%, rgb(${r2},${g2},${b2}) 100%)`;
+    let gc = document.getElementById('gameContainer'); if(gc) gc.style.background = `linear-gradient(180deg, rgb(${r1},${g1},${b1}) 0%, rgb(${r2},${g2},${b2}) 100%)`;
 
     p.oldY = p.y; p.expressionTimer++; 
     if (p.chatTimer > 0) p.chatTimer--;
@@ -32,14 +32,13 @@ function loop() {
     
     // HUD POWER BAR 
     const pwrCon = document.getElementById('powerBar'), pwrFill = document.getElementById('powerFill');
-    if (p.rocketTimer > 0) { pwrCon.style.display='block'; pwrFill.style.width=(p.rocketTimer/80*100)+'%'; pwrFill.style.background='#ef4444'; }
-    else if (p.flyTimer > 0) { pwrCon.style.display='block'; pwrFill.style.width=(p.flyTimer/150*100)+'%'; pwrFill.style.background='#60a5fa'; }
-    else if (p.djTimer > 0) { pwrCon.style.display='block'; pwrFill.style.width=(p.djTimer/600*100)+'%'; pwrFill.style.background='#fde047'; }
-    else if (p.balloonTimer > 0) { pwrCon.style.display='block'; pwrFill.style.width=(p.balloonTimer/400*100)+'%'; pwrFill.style.background='#f43f5e'; }
-    else if (p.starCharges > 0) { pwrCon.style.display='block'; pwrFill.style.width='100%'; pwrFill.style.background='#fbbf24'; }
-    else { pwrCon.style.display = 'none'; }
+    if (p.flyTimer > 0) { if (pwrCon) pwrCon.style.display='block'; if (pwrFill) { pwrFill.style.width=(p.flyTimer/150*100)+'%'; pwrFill.style.background='#60a5fa'; } }
+    else if (p.djTimer > 0) { if (pwrCon) pwrCon.style.display='block'; if (pwrFill) { pwrFill.style.width=(p.djTimer/600*100)+'%'; pwrFill.style.background='#fde047'; } }
+    else if (p.balloonTimer > 0) { if (pwrCon) pwrCon.style.display='block'; if (pwrFill) { pwrFill.style.width=(p.balloonTimer/400*100)+'%'; pwrFill.style.background='#f43f5e'; } }
+    else if (p.starCharges > 0) { if (pwrCon) pwrCon.style.display='block'; if (pwrFill) { pwrFill.style.width='100%'; pwrFill.style.background='#fbbf24'; } }
+    else { if (pwrCon) pwrCon.style.display = 'none'; }
 
-    document.getElementById('heartContainer').style.display = p.hasHeart ? 'flex' : 'none';
+    let hc = document.getElementById('heartContainer'); if(hc) hc.style.display = p.hasHeart ? 'flex' : 'none';
 
     currentMeters = Math.max(0, Math.floor((GROUND_Y - p.y) / 50));
     if (gameState === 'PLAY' && currentMeters > highScore) { 
@@ -54,8 +53,7 @@ function loop() {
     // LOGIKA FISIKA
     TERMINAL_V = (p.balloonTimer > 0 && p.vy > 0) ? 4 : 18; 
 
-    if (p.rocketTimer > 0) { p.rocketTimer--; p.vy = ROCKET_FORCE; }
-    else if (p.flyTimer > 0) { p.flyTimer--; p.vy = FLY_FORCE; }
+    if (p.flyTimer > 0) { p.flyTimer--; p.vy = FLY_FORCE; }
     else { p.vy += GRAVITY; if (p.vy > TERMINAL_V) p.vy = TERMINAL_V; }
     
     if (p.djTimer > 0) p.djTimer--;
@@ -156,9 +154,10 @@ function loop() {
             
             lbSubmit(playerName, highScore);
             
-            if (window.updateGameStats) {
+            
+                        if (window.updateGameStats) {
                 window.updateGameStats(currentRunJumps, currentMeters);
-                let totalRunCoins = Math.floor(currentMeters / 10); // 1 coin per 10m
+                let totalRunCoins = Math.floor(currentMeters / 10) + (p.collectedCoins || 0);
                 let runCoins = totalRunCoins - (window.rewardedCoinsThisRun || 0);
                 if (runCoins > 0 && window.addCoins) {
                     window.addCoins(runCoins);
@@ -169,6 +168,7 @@ function loop() {
                 }
                 currentRunJumps = 0; // reset for next run
             }
+
         }
     }
 
@@ -202,7 +202,7 @@ function loop() {
     let topLvl = Math.floor((GROUND_Y - camY + H) / PLAT_GAP) + 6; 
     let botLvl = Math.max(0, Math.floor((GROUND_Y - (camY+H)) / PLAT_GAP) - 3);
     for (let l=botLvl; l<=topLvl; l++) initLevel(l);
-    for (let [k,v] of platforms) if (k>0 && (k<botLvl-8||k>topLvl+8)) { platforms.delete(k); stars.delete(k); gemMap.delete(k); coinsMap.delete(k); items.delete(k); }
+    for (let [k,v] of platforms) if (k>0 && (k<botLvl-8||k>topLvl+8)) { platforms.delete(k); gemMap.delete(k); coinsMap.delete(k); items.delete(k); enemiesMap.delete(k); }
 
     updateLiveTopUI(); 
     ctx.save(); ctx.translate(mapOffsetX, -camY);
@@ -212,20 +212,73 @@ function loop() {
     if (gameState === 'PLAY') {
         if (!p.isFreeFalling) {
 
+            if (p.magnetTimer > 0) {
+                p.magnetTimer--;
+                if (p.magnetTimer % 10 === 0) {
+                    spawnParticles(p.x, p.y - 20, '#fde047', 2);
+                }
+            }
+
+            
+            for (let [k,en] of enemiesMap) {
+                en.update(); en.draw();
+                if (p.hurtTimer <= 0 && Math.abs(p.x - en.x) < 30 && Math.abs(p.y - en.y) < 30) {
+                    if (p.hasHeart || p.flyTimer > 0 || p.starCharges > 0) {
+                        p.hasHeart = false;
+                        p.hurtTimer = 60;
+                        p.vy = JUMP_FORCE;
+                        spawnParticles(p.x, p.y, '#ef4444', 20);
+                        floatText(p.x, p.y, 'KEBAL!', '#fff');
+                        enemiesMap.delete(k); // kill enemy
+                    } else if (p.vy > 0 && p.y < en.y - 10) {
+                        // bounce on enemy
+                        p.vy = JUMP_FORCE;
+                        spawnParticles(en.x, en.y, '#a3e635', 15);
+                        enemiesMap.delete(k);
+                    } else {
+                        if(window.showGameOver) window.showGameOver(currentMeters, Math.floor(currentMeters / 10));
+                    }
+                }
+            }
+
             for (let [k,c] of coinsMap) {
                 if (p.collectedLoot.has(c.id) && Date.now() - p.collectedLoot.get(c.id) < 5000) continue;
+                
+                if (p.magnetTimer > 0) {
+                    let dx = p.x - c.x;
+                    let dy = p.y - c.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 150) {
+                        c.x += dx * 0.1;
+                        c.y += dy * 0.1;
+                    }
+                }
+                
                 c.update();
-                if (Math.abs(p.x - c.x) < 30 && p.y > c.y - 30 && p.y < c.y + 20) {
+                
+                if (Math.abs(p.x - c.x) < 30 && Math.abs(p.y - c.y) < 30) {
                     p.collectedLoot.set(c.id, Date.now());
                     spawnParticles(c.x, c.y, '#fde047', 15);
-                    coins += 1;
-                    if(typeof saveUserData === 'function') saveUserData();
+                    p.collectedCoins = (p.collectedCoins || 0) + 1;
+                    if (window.addCoins) window.addCoins(1);
+                    window.rewardedCoinsThisRun = (window.rewardedCoinsThisRun || 0) + 1;
                 }
             }
             for (let [k,gm] of gemMap) {
                 if (p.collectedLoot.has(gm.id) && Date.now() - p.collectedLoot.get(gm.id) < 5000) continue;
+                
+                if (p.magnetTimer > 0) {
+                    let dx = p.x - gm.x;
+                    let dy = p.y - gm.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist < 150) {
+                        gm.x += dx * 0.1;
+                        gm.y += dy * 0.1;
+                    }
+                }
+                
                 gm.update(); gm.draw();
-                if (p.flyTimer<=0 && p.rocketTimer<=0 && Math.abs(p.x-gm.x)<35 && p.y>gm.y-35 && p.y<gm.y+22) { 
+                if (Math.abs(p.x-gm.x)<35 && Math.abs(p.y-gm.y)<35) { 
                     p.collectedLoot.set(gm.id, Date.now()); 
                     gems_collected = (typeof gems_collected !== 'undefined' ? gems_collected : 0) + 1;
                     spawnParticles(gm.x, gm.y, '#34d399', 15); floatText(gm.x, gm.y, '+1 GEM', '#059669');
@@ -234,39 +287,32 @@ function loop() {
                     saveUserData();
                 }
             }
-            for (let [k,s] of stars) {
-                if (p.collectedLoot.has(s.id) && Date.now() - p.collectedLoot.get(s.id) < 5000) continue;
-                s.update(); s.draw();
-                if (p.flyTimer<=0 && p.rocketTimer<=0 && Math.abs(p.x-s.x)<35 && p.y>s.y-35 && p.y<s.y+22) { 
-                    p.collectedLoot.set(s.id, Date.now()); 
-                    p.starCharges = 1; 
-                    spawnParticles(s.x, s.y, '#fbbf24', 15); floatText(s.x, s.y, 'BINTANG AKTIF!', '#f59e0b'); 
-                }
-            }
             for (let [k,it] of items) {
                 if (p.collectedLoot.has(it.id) && Date.now() - p.collectedLoot.get(it.id) < 5000) continue;
                 it.update(); it.draw();
-                if (p.flyTimer <= 0 && p.rocketTimer <= 0) {
+                if (p.flyTimer <= 0 && 0 <= 0) {
                     if (Math.abs(p.x-it.x)<38 && p.y>it.y-38 && p.y<it.y+25) {
                         p.collectedLoot.set(it.id, Date.now()); spawnParticles(it.x, it.y, '#fff', 20);
                         if (it.type==='hat') { p.flyTimer=150 + (powerupLevels && powerupLevels['hat'] ? powerupLevels['hat'] : 1) * 30; floatText(it.x,it.y,'TERBANG!','#60a5fa'); } 
-                        if (it.type==='rocket') { p.rocketTimer=80 + (powerupLevels && powerupLevels['rocket'] ? powerupLevels['hat'] : 1) * 20; floatText(it.x,it.y,'ROKET!','#ef4444'); } 
-                        if (it.type==='dj') { p.djTimer=600 + (powerupLevels && powerupLevels['dj'] ? powerupLevels['hat'] : 1) * 100; p.hasDJ=true; floatText(it.x,it.y,'DOUBLE JUMP!','#fde047'); }
-                        if (it.type==='heart') { p.hasHeart=true; floatText(it.x,it.y,'NYAWA EXTRA!','#ef4444'); }
-                        if (it.type==='balloon') { p.balloonTimer=400 + (powerupLevels && powerupLevels['balloon'] ? powerupLevels['hat'] : 1) * 50; floatText(it.x,it.y,'BALON JATUH LAMBAT!','#f43f5e'); }
-                    }
+                        if (it.type==='superjump') { p.starCharges=3 + (powerupLevels && powerupLevels['superjump'] ? powerupLevels['superjump'] : 1); floatText(it.x,it.y,'SUPER JUMP!','#fbbf24'); }
+                        if (it.type==='dj') { p.djTimer=600 + (powerupLevels && powerupLevels['dj'] ? powerupLevels['dj'] : 1) * 100; p.hasDJ=true; floatText(it.x,it.y,'DOUBLE JUMP!','#fde047'); }
+                        if (it.type==='heart' || it.type==='extralife') { p.hasHeart=true; floatText(it.x,it.y,'EXTRA LIFE!','#ef4444'); }
+                        if (it.type==='balloon' || it.type==='slowfall') { p.balloonTimer=400 + (powerupLevels && powerupLevels['balloon'] ? powerupLevels['balloon'] : 1) * 50; floatText(it.x,it.y,'SLOW FALL!','#f43f5e'); }
+                        if (it.type==='shield') { p.hurtTimer=500 + (powerupLevels && powerupLevels['shield'] ? powerupLevels['shield'] : 1) * 60; floatText(it.x,it.y,'SHIELD!','#a855f7'); }
+                        if (it.type==='magnet') { p.magnetTimer=600 + (powerupLevels && powerupLevels['magnet'] ? powerupLevels['magnet'] : 1) * 70; floatText(it.x,it.y,'MAGNET!','#f43f5e'); }
+                                            }
                 }
             }
         } else {
+            for (let [k,en] of enemiesMap) en.draw();
             for (let [k,c] of coinsMap) if(!(p.collectedLoot.has(c.id) && Date.now()-p.collectedLoot.get(c.id)<5000)) c.draw();
             for (let [k,gm] of gemMap) if(!(p.collectedLoot.has(gm.id) && Date.now()-p.collectedLoot.get(gm.id)<5000)) gm.draw();
-            for (let [k,s] of stars) if(!(p.collectedLoot.has(s.id) && Date.now()-p.collectedLoot.get(s.id)<5000)) s.draw();
-            for (let [k,it] of items) if(!(p.collectedLoot.has(it.id) && Date.now()-p.collectedLoot.get(it.id)<5000)) it.draw();
+                        for (let [k,it] of items) if(!(p.collectedLoot.has(it.id) && Date.now()-p.collectedLoot.get(it.id)<5000)) it.draw();
         }
     }
 
     // Cek Pijakan Platform
-    if (gameState === 'PLAY' && p.vy > 0 && p.flyTimer<=0 && p.rocketTimer<=0 && !p.isIdle && !p.isFreeFalling) {
+    if (gameState === 'PLAY' && p.vy > 0 && p.flyTimer<=0 && 0<=0 && !p.isIdle && !p.isFreeFalling) {
         for (let [k,pl] of platforms) {
             if (pl.broken || !pl.isSolid || pl.y > camY + H + 10) continue; 
             
@@ -286,7 +332,7 @@ function loop() {
                             p.hasHeart = false; p.hurtTimer = 60; p.vy = JUMP_FORCE; spawnParticles(p.x, p.y, '#ef4444', 20);
                             floatText(p.x, p.y, 'KEBAL!', '#fff');
                         } else {
-                            gameOver(); break;
+                            if(window.showGameOver) window.showGameOver(currentMeters, Math.floor(currentMeters / 10)); break;
                         }
                     } else {
                         p.vy = JUMP_FORCE;
@@ -363,7 +409,7 @@ function loop() {
     }
     
     let isFallingLocal = p.isFreeFalling || p.vy > 8;
-    drawCharacter(p.x, p.y, playerColor, p.scaleX, p.scaleY, playerName, p.facing, p.flyTimer, p.rocketTimer, p.djTimer, p.balloonTimer, p.chatMsg, p.chatTimer, p.expressionTimer, isFallingLocal, playerType, p.hurtTimer > 0, p.vy, window.characterManager ? window.characterManager.selectedSkin : 'default');
+    drawCharacter(p.x, p.y, playerColor, p.scaleX, p.scaleY, playerName, p.facing, p.flyTimer, 0, p.djTimer, p.balloonTimer, p.chatMsg, p.chatTimer, p.expressionTimer, isFallingLocal, playerType, p.hurtTimer > 0, p.vy, window.characterManager ? window.characterManager.selectedSkin : 'default');
     
     ctx.restore(); 
 }

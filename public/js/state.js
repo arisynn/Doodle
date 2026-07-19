@@ -23,14 +23,14 @@ let playerType  = 'doodle';
 
 let p = {
     x: 0, y: 0, vx: 0, vy: 0, oldY: 0, scaleX: 1, scaleY: 1, facing: 'right',
-    flyTimer: 0, rocketTimer: 0, djTimer: 0, balloonTimer: 0, hurtTimer: 0,
-    hasDJ: false, hasHeart: false, starCharges: 0, isFreeFalling: false,
+    flyTimer: 0, magnetTimer: 0, djTimer: 0, balloonTimer: 0, hurtTimer: 0,
+    hasDJ: false, hasHeart: false, isFreeFalling: false,
     chatMsg: '', chatTimer: 0, idleBreath: 0, isIdle: false,
     currentPlatform: null, platOffsetX: 0, expressionTimer: 0,
     collectedLoot: new Map() 
 };
 
-let peers = {}, platforms = new Map(), stars = new Map(), gemMap = new Map(), coinsMap = new Map(), items = new Map(), particles = [];
+let peers = {}, platforms = new Map(), gemMap = new Map(), coinsMap = new Map(), enemiesMap = new Map(), items = new Map(), particles = [];
 let camY = 0, currentMeters = 0, displayScore = 0;
 let highScore = parseInt(localStorage.getItem('doodle_hs_m12') || '0'); 
 let lastSubmittedScore = 0;
@@ -38,7 +38,7 @@ let lastSubmittedScore = 0;
 document.getElementById('highScoreVal').textContent = highScore + 'm';
 
 // FISIKA
-const GRAVITY = 0.55, JUMP_FORCE = -14, SPRING_FORCE = -20, TRAMPOLINE_FORCE = -25, FLY_FORCE = -20, ROCKET_FORCE = -30, BUMPER_FORCE = -17, BOOST_FORCE = -30;
+const GRAVITY = 0.52, JUMP_FORCE = -14, SPRING_FORCE = -20, TRAMPOLINE_FORCE = -25, FLY_FORCE = -20, ROCKET_FORCE = -30, BUMPER_FORCE = -17, BOOST_FORCE = -30;
 let TERMINAL_V = 18; const FALL_V = 35, MOVE_SPEED = 9;
 const PLAT_GAP = 145; 
 let keys = { left: false, right: false };
