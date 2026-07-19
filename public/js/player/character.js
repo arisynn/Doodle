@@ -23,13 +23,14 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
     ctx.translate(cx, cy);
     ctx.scale(scX, scY);
     
+    // Membalik gambar jika menghadap kiri
     if (facing === 'left') {
         ctx.scale(-1, 1);
     }
 
     let h = 38, w = 34;
     
-    // Aksesoris (back)
+    // Aksesoris belakang (misal: Balon, Jetpack)
     const INK = '#0f172a';
     if (blT > 0) {
         ctx.fillStyle='#ef4444'; ctx.strokeStyle=INK; ctx.lineWidth=2.5;
@@ -42,7 +43,7 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
         ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.moveTo(-6, -h+38); ctx.lineTo(6, -h+38); ctx.lineTo(0, -h+55); ctx.fill();
     }
 
-    // Determine state for sprite
+    // Menentukan state / pose karakter
     let state = 'idle';
     if (rocketT > 0 || flyT > 0) {
         state = 'fly';
@@ -52,38 +53,31 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
         state = 'jump';
     }
 
-    
-    
     let sprite = null;
     if (window.characterManager) {
         sprite = window.characterManager.getSprite(state, skinId);
     }
 
-
-    
     if (sprite && sprite.complete && sprite.naturalWidth > 0) {
-        // Draw image skin
-        // Setiap sprite dianggap memiliki 4 frame animasi (berjejer horizontal)
-        let frameCount = 4;
-        let frameW = sprite.naturalWidth / frameCount;
+        // Draw image skin (1 Frame Utuh / Tanpa Animasi Sprite Sheet)
+        let frameW = sprite.naturalWidth;
         let frameH = sprite.naturalHeight;
-            
-        let frameSpeed = 100; 
-        let currentFrame = Math.floor(Date.now() / frameSpeed) % frameCount;
                 
         if (sprite.naturalWidth <= 1 && sprite.naturalHeight <= 1) {
+            // Fallback kotak jika gambar kosong
             ctx.fillStyle = color;
             ctx.fillRect(-w/2, -h, w, h);
             ctx.strokeRect(-w/2, -h, w, h);
         } else {
-            // Kita tetapkan aturan ukuran karakter agar selalu presisi dan konsisten di canvas.
-            // Misalnya tinggi karakter = 45px. Kita hitung lebar berdasarkan rasio asli sprite.
-            let targetH = 45;
+            // Kita tetapkan aturan tinggi karakter agar konsisten di canvas (misal 45px).
+            let targetH = 45; 
+            // Lebar akan otomatis menyesuaikan rasio asli gambar kamu
             let spriteRatio = frameW / frameH;
             let targetW = targetH * spriteRatio;
             
-            // Draw di canvas dengan posisi anchor berada di bawah tengah (0, 0)
-            ctx.drawImage(sprite, currentFrame * frameW, 0, frameW, frameH, -targetW/2, -targetH, targetW, targetH);
+            // Draw di canvas. Gambar dirender full (0, 0, frameW, frameH)
+            // Posisi ditarik ke X = -targetW/2 (agar di tengah) dan Y = -targetH (agar nempel di garis bawah)
+            ctx.drawImage(sprite, 0, 0, frameW, frameH, -targetW/2, -targetH, targetW, targetH);
         }
     } else {
         // Fallback drawing if not loaded
@@ -92,7 +86,7 @@ function drawCharacter(cx, cy, color, scX, scY, name, facing, flyT, rocketT, djT
         ctx.strokeRect(-w/2, -h, w, h);
     }
 
-    // Aksesoris (front)
+    // Aksesoris depan (misal: Baling-baling, efek Double Jump)
     if (flyT > 0) {
         ctx.fillStyle='#38bdf8'; ctx.strokeStyle=INK; ctx.lineWidth=2.5;
         ctx.beginPath(); ctx.moveTo(0, -h-5); ctx.lineTo(-15, -h-15); ctx.lineTo(15, -h-15); ctx.closePath(); ctx.fill(); ctx.stroke();
