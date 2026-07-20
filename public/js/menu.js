@@ -39,6 +39,92 @@ const achievementsList = [
 ];
 let unlockedAch = JSON.parse(localStorage.getItem('doodle_ach') || '[]');
 
+let cloudSyncInProgress = false;
+
+async function syncToCloud() {
+    if (typeof playerName === 'undefined' || !playerName) return;
+    if (cloudSyncInProgress) return;
+    cloudSyncInProgress = true;
+    try {
+        let payload = {
+            coins, playerGems, powerupLevels, powerupConsumables,
+            unlockedItems, stats, dailyChallenge, unlockedAch,
+            highScore: typeof highScore !== 'undefined' ? highScore : 0,
+            selectedSkin: (window.characterManager && window.characterManager.selectedSkin) ? window.characterManager.selectedSkin : 'default'
+        };
+        await upSet('user_' + playerName, payload);
+    } catch(e) {}
+    cloudSyncInProgress = false;
+}
+
+function resetLocalState() {
+    coins = 0;
+    playerGems = 0;
+    powerupLevels = {"hat":1, "superjump":1, "dj":1, "balloon":1, "shield":1, "magnet":1};
+    powerupConsumables = {"propellerhat":0, "superjump":0, "doublejump":0, "slowfall":0, "extralife":0, "shield":0, "magnet":0};
+    unlockedItems = ["default"];
+    stats = {"gamesPlayed": 0, "totalJumps": 0, "maxHeight": 0};
+    unlockedAch = [];
+    if (typeof highScore !== 'undefined') highScore = 0;
+    if (window.characterManager) window.characterManager.selectedSkin = 'default';
+    
+    // Save defaults to storage
+    localStorage.setItem('doodle_gems', 0);
+    localStorage.setItem('doodle_powerup_levels', JSON.stringify(powerupLevels));
+    localStorage.setItem('doodle_consumables', JSON.stringify(powerupConsumables));
+    localStorage.setItem('doodle_coins', 0);
+    localStorage.setItem('doodle_unlocked', JSON.stringify(unlockedItems));
+    localStorage.setItem('doodle_stats', JSON.stringify(stats));
+    localStorage.setItem('doodle_ach', JSON.stringify(unlockedAch));
+    localStorage.setItem('doodle_hs_m12', 0);
+    localStorage.setItem('doodle_skin', 'default');
+    
+    let hsVal = document.getElementById('highScoreVal');
+    if (hsVal) hsVal.textContent = '0m';
+}
+
+async function loadFromCloud(name) {
+    try {
+        let remote = await upGet('user_' + name);
+        if (remote) {
+            if (remote.coins !== undefined) coins = remote.coins;
+            if (remote.playerGems !== undefined) playerGems = remote.playerGems;
+            if (remote.powerupLevels !== undefined) powerupLevels = remote.powerupLevels;
+            if (remote.powerupConsumables !== undefined) powerupConsumables = remote.powerupConsumables;
+            if (remote.unlockedItems !== undefined) unlockedItems = remote.unlockedItems;
+            if (remote.stats !== undefined) stats = remote.stats;
+            if (remote.dailyChallenge !== undefined) dailyChallenge = remote.dailyChallenge;
+            if (remote.unlockedAch !== undefined) unlockedAch = remote.unlockedAch;
+            
+            if (remote.highScore !== undefined && typeof highScore !== 'undefined') {
+                highScore = remote.highScore;
+                let hsVal = document.getElementById('highScoreVal');
+                if (hsVal) hsVal.textContent = highScore + 'm';
+            }
+            if (remote.selectedSkin !== undefined && window.characterManager) {
+                window.characterManager.selectedSkin = remote.selectedSkin;
+            }
+        } else {
+            // New user on cloud, reset local state to ensure clean start
+            resetLocalState();
+        }
+        
+        // Save to local storage after pulling from cloud or resetting
+        localStorage.setItem('doodle_gems', playerGems);
+        localStorage.setItem('doodle_powerup_levels', JSON.stringify(powerupLevels));
+        localStorage.setItem('doodle_consumables', JSON.stringify(powerupConsumables));
+        localStorage.setItem('doodle_coins', coins);
+        localStorage.setItem('doodle_unlocked', JSON.stringify(unlockedItems));
+        localStorage.setItem('doodle_stats', JSON.stringify(stats));
+        localStorage.setItem('doodle_daily', JSON.stringify(dailyChallenge));
+        localStorage.setItem('doodle_ach', JSON.stringify(unlockedAch));
+        if (remote && remote.highScore !== undefined) localStorage.setItem('doodle_hs_m12', remote.highScore);
+        if (remote && remote.selectedSkin !== undefined) localStorage.setItem('doodle_skin', remote.selectedSkin);
+        
+        updateUI();
+    } catch(e) {}
+}
+
 function saveUserData() {
     localStorage.setItem('doodle_gems', playerGems);
     localStorage.setItem('doodle_powerup_levels', JSON.stringify(powerupLevels));
@@ -49,6 +135,7 @@ function saveUserData() {
     localStorage.setItem('doodle_daily', JSON.stringify(dailyChallenge));
     localStorage.setItem('doodle_ach', JSON.stringify(unlockedAch));
     updateUI();
+    syncToCloud();
 }
 
 function updateUI() {
@@ -201,9 +288,7 @@ function renderUpgrades() {
         'superjump': { name: 'Super Jump', desc: 'Lompatan lebih tinggi', max: 5, baseCost: 150, icon: 'assets/powerups/superjump.png' },
         'dj': { name: 'Double Jump', desc: 'Lompat dua kali', max: 5, baseCost: 80, icon: 'assets/powerups/doublejump.png' },
         'balloon': { name: 'Slow Fall', desc: 'Jatuh lambat lebih lama', max: 5, baseCost: 80, icon: 'assets/powerups/slowfall.png' },
-        'shield': { name: 'Shield', desc: 'Kebal lebih lama', max: 5, baseCost: 200, icon: 'assets/powerups/shield.png' },
-        'extralife': { name: 'Extra Life', desc: 'Menghidupkan kembali', max: 5, baseCost: 500, icon: 'assets/powerups/extralife.png' },
-        'magnet': { name: 'Magnet', desc: 'Durasi tarikan koin lebih lama', max: 5, baseCost: 120, icon: 'assets/powerups/magnet.png' }
+        'extralife': { name: 'Extra Life', desc: 'Menghidupkan kembali', max: 5, baseCost: 500, icon: 'assets/powerups/extralife.png' }
     };
     
     let html = '';
@@ -260,20 +345,26 @@ if (localStorage.getItem('doodle_n12')) {
     document.getElementById('nameInput').value = playerName;
     document.getElementById('menuPlayerName').innerText = playerName;
     showScreen('main');
+    loadFromCloud(playerName);
 } else {
     showScreen('login');
 }
 
 // ── LISTENERS ──
-document.getElementById('loginBtn').onclick = () => {
+document.getElementById('loginBtn').onclick = async () => {
     let name = document.getElementById('nameInput').value.trim();
     if (!name || name.length < 2) {
         document.getElementById('errMsg').textContent = 'Minimal 2 huruf!';
         return;
     }
+    document.getElementById('loginBtn').innerText = 'Loading...';
+    document.getElementById('loginBtn').disabled = true;
     playerName = name;
     localStorage.setItem('doodle_n12', playerName);
+    await loadFromCloud(playerName);
     document.getElementById('menuPlayerName').innerText = playerName;
+    document.getElementById('loginBtn').innerText = 'MULAI PETUALANGAN';
+    document.getElementById('loginBtn').disabled = false;
     showScreen('main');
 };
 
@@ -317,9 +408,7 @@ function renderPowerupShop() {
         'superjump': { name: 'Super Jump', cost: 75, icon: 'assets/powerups/superjump.png' },
         'doublejump': { name: 'Double Jump', cost: 40, icon: 'assets/powerups/doublejump.png' },
         'slowfall': { name: 'Slow Fall', cost: 40, icon: 'assets/powerups/slowfall.png' },
-        'shield': { name: 'Shield', cost: 100, icon: 'assets/powerups/shield.png' },
-        'extralife': { name: 'Extra Life', cost: 250, icon: 'assets/powerups/extralife.png' },
-        'magnet': { name: 'Magnet', cost: 60, icon: 'assets/powerups/magnet.png' }
+        'extralife': { name: 'Extra Life', cost: 250, icon: 'assets/powerups/extralife.png' }
     };
     
     let html = '';

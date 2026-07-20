@@ -33,8 +33,7 @@ function getLevelData(lvl) {
         else if (r3 > 0.4) type = 'fragile';
         else if (r3 > 0.35) type = 'trampoline';
         else if (r3 > 0.3) type = 'portal';
-        else if (r3 > 0.25) type = 'bumper';
-        else if (r3 > 0.15) type = 'spike';
+        else if (r3 > 0.15) type = 'bumper';
     }
 
     return { type, pw, px, rng, r4 };
@@ -84,19 +83,11 @@ function generateLevel(lvl) {
     if (type !== 'updown') {
         if (['normal', 'moving', 'icy', 'conveyor'].includes(type) && lvl > 5 && r_item > 0.90) {
             let r_which = d.rng();
-            if (r_which > 0.85) item = 'superjump';
-            else if (r_which > 0.7) item = 'hat';
-            else if (r_which > 0.55) item = 'dj'; 
-            else if (r_which > 0.4) item = 'extralife'; 
-            else if (r_which > 0.25) item = 'shield';
-            else if (r_which > 0.1) item = 'magnet';
-            else item = 'slowfall';
-        } else if (lvl > 10 && r_item > 0.85 && r_item <= 0.90) {
-            hasEnemy = true;
-        } else if (r_item < 0.05) {
-            hasGem = true;
-        } else if (r_item < 0.35) {
-            hasCoin = true;
+            if (r_which > 0.8) item = 'superjump';
+            else if (r_which > 0.6) item = 'hat';
+            else if (r_which > 0.4) item = 'dj';
+            else if (r_which > 0.2) item = 'slowfall';
+            else item = 'extralife';
         }
     }
 

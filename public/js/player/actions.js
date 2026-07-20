@@ -1,9 +1,12 @@
 // ── RESET GAME ──
 let currentRunJumps = 0;
 let rewardedCoinsThisRun = 0;
+let usedConsumableThisRun = false;
+
 function resetGame() {
     currentRunJumps = 0;
     rewardedCoinsThisRun = 0;
+    usedConsumableThisRun = false;
     p.vy = JUMP_FORCE; p.vx = 0;
     p.flyTimer=0;  p.djTimer=0; p.balloonTimer=0; p.hurtTimer=0; p.magnetTimer=0;
     p.hasDJ=false; p.hasHeart=false;
@@ -70,9 +73,7 @@ window.renderInventoryBar = function() {
         'propellerhat': 'assets/powerups/propellerhat.png',
         'superjump': 'assets/powerups/superjump.png',
         'doublejump': 'assets/powerups/doublejump.png',
-        'slowfall': 'assets/powerups/slowfall.png',
-        'shield': 'assets/powerups/shield.png',
-        'magnet': 'assets/powerups/magnet.png'
+        'slowfall': 'assets/powerups/slowfall.png'
     };
     
     for (let k in icons) {
@@ -87,7 +88,7 @@ window.renderInventoryBar = function() {
     }
     
     inv.innerHTML = html;
-    if (gameState === 'PLAY' && hasItems) {
+    if (gameState === 'PLAY' && hasItems && !usedConsumableThisRun) {
         inv.style.display = 'flex';
     } else {
         inv.style.display = 'none';
@@ -97,7 +98,9 @@ window.renderInventoryBar = function() {
 window.useConsumable = function(key) {
     if (gameState !== 'PLAY') return;
     if (!powerupConsumables[key] || powerupConsumables[key] <= 0) return;
+    if (usedConsumableThisRun) return;
     
+    usedConsumableThisRun = true;
     powerupConsumables[key]--;
     saveUserData();
     renderInventoryBar();

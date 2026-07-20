@@ -100,7 +100,8 @@ function loop() {
             }
             
             // Jatuh jika melewati batas ujung platform
-            if (p.currentPlatform && (p.x < pl.x || p.x > pl.x + pl.w)) {
+            let pwidth = 16;
+            if (p.currentPlatform && (p.x + pwidth < pl.x || p.x - pwidth > pl.x + pl.w)) {
                 p.isIdle = false; p.currentPlatform = null;
             }
         }
