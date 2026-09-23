@@ -1,0 +1,38 @@
+import { SKINS } from './store.js';
+import { findItem } from './economy.js';
+export const img = (name, cls = '', alt = '', id = '') => `<img class="${cls}" src="/assets/sky/${name}.png" alt="${alt}" ${id ? `data-testid="${id}"` : ''} draggable="false">`;
+export const icon = name => img('ui-' + name, 'ui-icon');
+export const format = n => new Intl.NumberFormat('id-ID').format(n);
+export const wallet = (balance, id) => `<div class="wallet" data-testid="${id}">${img('star')}<span>${format(balance)} <small>Bintang</small></span></div>`;
+export function header(store) {
+  return `<a class="brand" href="#beranda" data-testid="brand-home">${img('piko', 'brand-character')}<span>lompat<br>langit<span class="brand-dot">.</span></span></a><div class="header-right">${wallet(store.data.balance, 'header-balance')}<button class="icon-button sound-toggle" data-testid="header-sound-toggle" aria-label="${store.data.settings.sound ? 'Matikan' : 'Aktifkan'} suara" aria-pressed="${store.data.settings.sound}">${icon(store.data.settings.sound ? 'sound' : 'mute')}</button><a class="icon-button" href="#pengaturan" data-testid="settings-link" aria-label="Pengaturan">${icon('settings')}</a></div>`;
+}
+export function home(store) {
+  const skin = SKINS.find(s => s.id === store.data.skin), ready = store.missions().filter(m => m.done).length, supply = findItem(store.data.loadout);
+  return `<section class="home-view" data-testid="home-screen"><div class="hero"><div class="hero-copy">
+    <div class="eyebrow" data-testid="home-eyebrow"><i></i> LUCU BELUM TENTU RAMAH</div>
+    <h1 data-testid="home-heading">Satu tap.<br><span>Jangan salah langkah.</span></h1>
+    <p class="hero-description" data-testid="home-description">Pijakan menipu. Musuh mengintai. Langit tak memaafkan.<br class="desktop-br"> Injak, tap, lalu buktikan seberapa jauh kamu bertahan.</p>
+    <div class="hero-actions"><button class="primary-button play-button" data-action="play" data-testid="play-button">${icon('play')} Berani melompat? ${icon('arrow')}</button>
+    <span class="control-hint" data-testid="home-control-hint">${icon('swipe')} Tap arah untuk lompat. Mendarat dulu, baru tap lagi.</span>
+    ${supply ? `<a class="prepared-hint" href="#toko" data-testid="home-prepared-supply">${img(supply.art)} ${supply.name} siap · Dipakai pada tap pertama</a>` : ''}</div></div>
+    <div class="hero-art" data-testid="home-illustration"><div class="art-halo"></div>${img('cloud', 'hero-cloud cloud-one')}${img('cloud', 'hero-cloud cloud-two')}<div class="flight-path"></div>${img('star', 'hero-star star-one')}${img('star', 'hero-star star-two')}${img('star', 'hero-star star-three')}
+    <div class="character-scene">${img(skin.id, 'hero-character', skin.name, 'selected-character')}${img('island', 'hero-island', 'Pulau kecil mengambang di langit')}</div><div class="character-note" data-testid="character-greeting">Jangan jatuhin aku!<span>↙</span></div>
+    <div class="record-tag" data-testid="home-best">${img('trophy')}<span>REKOR TERBAIK<strong>${format(store.data.best)} <small>meter</small></strong></span></div></div></div>
+    <div class="home-links"><a class="feature-card shop-link" href="#toko" data-testid="shop-link"><div class="feature-illustration skin-illustration">${img('momo')}</div><div><h2>Siapkan gaya & bekal</h2><p>Setiap Bintang ada gunanya</p></div><span class="card-arrow">${icon('arrow')}</span></a>
+    <a class="feature-card" href="#misi" data-testid="missions-link"><div class="feature-illustration">${img('flag')}</div><div><h2>Misi untuk yang berani ${ready ? '<i class="notification-dot"></i>' : ''}</h2><p>${ready ? `${ready} hadiah siap diklaim!` : '3 tantangan menantimu'}</p></div><span class="card-arrow">${icon('arrow')}</span></a>
+    <a class="guide-link" href="#panduan" data-testid="guide-link">${icon('help')}<span>Sebelum menyesal,<strong>Cara bermain ${icon('arrow')}</strong></span></a></div><div class="home-footnote" data-testid="home-footnote">${img('star')} Lucu tampilannya. Kejam pijakannya. Sekali lagi?</div></section>`;
+}
+export const pageHead = (title, sub, id) => `<div class="page-heading"><a class="back-link" href="#beranda" data-testid="${id}-back">${icon('back')} Kembali</a><div class="eyebrow">JURNAL PETUALANGAN</div><h1 data-testid="${id}-title">${title}</h1><p data-testid="${id}-description">${sub}</p></div>`;
+export function skinGrid(store) {
+  return `<div class="skin-grid">${SKINS.map(s => {
+    const owned = store.data.owned.includes(s.id), equipped = store.data.skin === s.id, enough = store.data.balance >= s.price, locked = !owned && store.data.best < s.at;
+    return `<article class="skin-card ${equipped ? 'equipped' : ''}" data-testid="skin-card-${s.id}"><div class="skin-art" style="--skin-bg:${s.color}"><span class="skin-status" data-testid="skin-status-${s.id}">${equipped ? icon('check') + ' Dipakai' : owned ? 'Milikmu' : icon('lock') + ' Belum terbuka'}</span>${img(s.id, '', s.name, `skin-preview-${s.id}`)}<div class="skin-shadow"></div></div><div class="skin-detail"><h2 data-testid="skin-name-${s.id}">${s.name}</h2><p>${s.title}</p><button class="${equipped ? 'equipped-button' : 'secondary-button'} skin-action" data-testid="skin-action-${s.id}" data-skin="${s.id}" ${equipped || locked || (!owned && !enough) ? 'disabled' : ''}>${equipped ? icon('check') + ' Sedang dipakai' : owned ? 'Pakai skin' : img('star') + ' ' + s.price + ' Bintang'}</button><small class="${!owned ? 'insufficient' : 'skin-note'}" data-testid="skin-requirement-${s.id}">${locked ? `Capai rekor ${format(s.at)} m dahulu` : !owned && !enough ? `Butuh ${s.price - store.data.balance} Bintang lagi` : owned ? 'Kemampuan tetap sama' : 'Buka selamanya'}</small></div></article>`;
+  }).join('')}</div><p class="page-note" data-testid="shop-fairness">${icon('check')} Skin dan efek hanya kosmetik. Bekal opsional tersedia di tab Bekal.</p>`;
+}
+export function missionCard(m) {
+  return `<article class="mission-card ${m.done ? 'complete' : ''}" data-testid="mission-${m.id}"><div class="mission-icon">${img(m.icon)}</div><div class="mission-body"><div class="mission-title-row"><h2 data-testid="mission-title-${m.id}">${m.title}</h2><span class="level-label">TAHAP ${m.tier + 1}</span></div><p data-testid="mission-description-${m.id}">${m.text}</p><div class="progress-line"><progress data-testid="mission-progress-${m.id}" max="${m.target}" value="${m.progress}" aria-label="Progres ${m.title}"></progress><span data-testid="mission-counter-${m.id}">${format(m.progress)} / ${format(m.target)}</span></div><small>${m.id === 'height' ? 'Rekor tertinggi dalam satu permainan' : 'Progres berlanjut antarpermainan'}</small></div><div class="mission-reward">${img('star')}<strong data-testid="mission-reward-${m.id}">+${m.reward}</strong><button class="claim-button" data-testid="claim-${m.id}" data-claim="${m.id}" ${!m.done ? 'disabled' : ''}>${m.done ? 'Klaim hadiah' : 'Dalam perjalanan'}</button></div></article>`;
+}
+export function missions(store) {
+  return `<section class="subpage missions-page" data-testid="missions-screen">${pageHead('Langkah kecil. Nyali besar.', 'Bintang diperjuangkan, bukan dibagikan tanpa batas.', 'missions')}<div class="section-label"><span>3 MISI AKTIF</span><span>Selesaikan. Klaim. Lanjutkan.</span></div><div class="mission-list">${store.missions().map(m => missionCard(m)).join('')}</div><p class="page-note" data-testid="missions-explanation">${icon('flag')} Target meningkat, hadiah dibatasi. Setiap tahap hanya bisa diklaim sekali.</p></section>`;
+}

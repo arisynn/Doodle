@@ -1,0 +1,14 @@
+node_modules/
+**/node_modules/
+.env
+.env.*
+*.log
+__pycache__/
+.DS_Store
+playwright-report/
+test-results/
+*.env
+credentials.json
+*.pem
+*.key
+.credentials

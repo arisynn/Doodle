@@ -1,0 +1,55 @@
+{
+  "summary": "Frontend-only expansion retest completed with deterministic procedural regression checks and responsive UI/integration validation. Most UI/runtime requirements pass; two procedural balancing rules fail in world generation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Procedural enemy placement",
+        "issue": "Enemy proximity cap requirement (max 3 within 720px) is violated; generated worlds commonly contain 4 enemies within one 720px vertical window.",
+        "affected_selectors": [
+          "/app/public/js/sky/world.js::spawnEnemy"
+        ]
+      },
+      {
+        "flow": "Shooter spacing",
+        "issue": "Shooter spacing occasionally drops below 260m (observed ~256.1m and ~256.8m), violating the stated minimum.",
+        "affected_selectors": [
+          "/app/public/js/sky/world.js::spawnEnemy"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/tests/frontend_procedural_regression.mjs",
+    "/app/tests/procedural_diagnostics.mjs",
+    "/app/test_reports/iteration_2.json"
+  ],
+  "action_items": [
+    "In world.js spawnEnemy, enforce global/grouped vertical density rule (not just local candidate check) so no >3 hostiles exist in any 720px band.",
+    "In world.js shooter spacing, compute/check spacing using final spawn elevation context (post-gap/platform elevation) to guarantee >=260m in actual spawned shooter heights.",
+    "After fix, rerun /app/tests/frontend_procedural_regression.mjs and verify zero failures on seeds 1..300 with /app/tests/procedural_diagnostics.mjs."
+  ],
+  "critical_code_review_comments": [
+    "spawnEnemy currently checks nearby enemies against candidate platform y only; this allows overlapping windows where middle enemies can still see 4 within 720px.",
+    "Shooter lockout uses `height` sampled before top/gap update, while shooter entities are spawned relative to final platform y, creating spacing drift that can undershoot 260m in spawned results."
+  ],
+  "updated_files": [
+    "/app/tests/frontend_procedural_regression.mjs",
+    "/app/tests/procedural_diagnostics.mjs",
+    "/app/test_reports/iteration_2.json"
+  ],
+  "success_rate": {
+    "backend": "N/A (frontend-only scope)",
+    "frontend": "90%"
+  },
+  "seed_data_creation": "No persistent seed data created. Deterministic seeds used in test scripts only.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Passed checks: app loads, no runtime console/network failures, PNG requests successful (145 observed, 0 failed), no SVG DOM nodes, guide tab counts correct (platforms 9, powers 6, enemies 7, zones 5), rocket non-stack behavior and timer rules pass in deterministic test, power badges render (6), mobile portrait 390x844 and 320x568 no horizontal overflow, storage warning recovery true->false passes. Remaining blockers are procedural enemy density and shooter spacing minima.",
+  "rca of the issue": "Reproduction: run `node /app/tests/frontend_procedural_regression.mjs` (fails consistently) and `node /app/tests/procedural_diagnostics.mjs` (300 seeds scanned). Results: enemy proximity violation appears in all 300/300 seeds (4 enemies within one 720px band), shooter spacing violation appears in 2/300 seeds (~256m). Root causes: (1) density check is local to spawn candidate and does not enforce a global 720px window cap across all enemies; (2) shooter spacing guard compares with `height` captured before platform gap/top update, while actual shooter spawn uses post-update platform position, causing occasional undershoot of intended 260m separation."
+}
