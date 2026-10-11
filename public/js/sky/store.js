@@ -1,12 +1,13 @@
 import { SHOP_ITEMS, INVENTORY_LIMIT, findItem, isPermanent, missionTarget, missionReward } from './economy.js';
+import { L } from './i18n.js';
 export const SAVE_KEY = 'lompat-langit-v1';
 export const SKINS = [
-  { id: 'piko', name: 'Piko', title: 'Si penjelajah kecil', price: 0, at: 0, color: '#daf4da' },
-  { id: 'momo', name: 'Momo', title: 'Hangat seperti senja', price: 80, at: 0, color: '#ffe4cb' },
-  { id: 'luna', name: 'Luna', title: 'Teman para bintang', price: 240, at: 900, color: '#e3e9fd' },
-  { id: 'nimbus', name: 'Nimbus', title: 'Pilot di atas awan', price: 600, at: 3200, color: '#f8eabd' }
+  { id: 'piko', name: 'Piko', title: 'Si penjelajah kecil', price: 0, at: 0, color: '#daf4da', ko: { name: '피코', title: '작은 탐험가' } },
+  { id: 'momo', name: 'Momo', title: 'Hangat seperti senja', price: 80, at: 0, color: '#ffe4cb', ko: { name: '모모', title: '노을처럼 따뜻한' } },
+  { id: 'luna', name: 'Luna', title: 'Teman para bintang', price: 240, at: 700, color: '#e3e9fd', ko: { name: '루나', title: '별들의 친구' } },
+  { id: 'nimbus', name: 'Nimbus', title: 'Pilot di atas awan', price: 600, at: 2200, color: '#f8eabd', ko: { name: '님버스', title: '구름 위의 파일럿' } }
 ];
-const fresh = () => ({ version: 2, balance: 0, best: 0, stars: 0, kills: 0, runs: 0, owned: ['piko'], skin: 'piko', tutorial: false, tutorialVersion: 2,
+const fresh = () => ({ version: 3, balance: 0, best: 0, stars: 0, kills: 0, runs: 0, owned: ['piko'], skin: 'piko', tutorial: false, tutorialVersion: 2,
   ownedItems: ['trail-none', 'landing-none'], equipped: { trail: 'trail-none', landing: 'landing-none' }, inventory: {}, loadout: null, party: null,
   economy: { opening: 0, earned: 0, spent: 0 }, ledger: [],
   settings: { sound: true, vibration: false, control: 'tap' }, tiers: { height: 0, stars: 0, kills: 0 }, bases: { stars: 0, kills: 0 } });
@@ -18,8 +19,9 @@ export class Store {
     try {
       this.storage ||= window.localStorage;
       const raw = JSON.parse(this.storage.getItem(SAVE_KEY));
-      if (raw?.version === 1 || raw?.version === 2) {
+      if ([1, 2, 3].includes(raw?.version)) {
         for (const k of ['balance', 'best', 'stars', 'kills', 'runs']) this.data[k] = integer(raw[k]);
+        if (raw.version < 3) this.data.best = Math.floor(this.data.best / 20);
         this.data.owned = [...new Set(['piko', ...(Array.isArray(raw.owned) ? raw.owned : []).filter(id => SKINS.some(s => s.id === id))])];
         if (this.data.owned.includes(raw.skin)) this.data.skin = raw.skin;
         this.data.tutorial = !!raw.tutorial && raw.tutorialVersion === 2;
@@ -71,8 +73,8 @@ export class Store {
       const tier = this.data.tiers[id], target = missionTarget(id, tier);
       const progress = Math.min(target, id === 'height' ? this.data.best : this.data[id] - this.data.bases[id]);
       return { id, tier, target, progress, reward: missionReward(id, tier),
-        title: ['Menyapa awan', 'Pemburu bintang', 'Langit yang aman'][i],
-        text: [`Capai ${target} m dalam satu permainan`, `Kumpulkan ${target} Bintang`, `Kalahkan ${target} musuh`][i],
+        title: [L('Menyapa awan', '구름에 인사하기'), L('Pemburu bintang', '별 사냥꾼'), L('Langit yang aman', '안전한 하늘')][i],
+        text: [L(`Capai ${target} m dalam satu permainan`, `한 판에서 ${target} m 도달`), L(`Kumpulkan ${target} Bintang`, `별 ${target}개 모으기`), L(`Kalahkan ${target} musuh`, `적 ${target}마리 처치`)][i],
         icon: ['flag', 'star', 'slime'][i], done: progress >= target };
     });
   }

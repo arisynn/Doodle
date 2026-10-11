@@ -12,25 +12,26 @@
   <link rel="apple-touch-icon" href="/assets/sky/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800;900&family=Patrick+Hand&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800;900&family=Patrick+Hand&family=Jua&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/sky.css">
   <link rel="stylesheet" href="/css/expansion.css">
   <link rel="stylesheet" href="/css/shop.css">
+  <link rel="stylesheet" href="/css/lang.css">
 </head>
 <body>
   <div class="scenery" aria-hidden="true"></div>
   <div class="app-shell" id="app-shell">
     <header class="topbar" id="topbar"></header>
     <main id="screen" data-testid="main-screen"></main>
-    <footer class="site-footer" id="footer" data-testid="site-footer"><span>Petualangan kecil. Langit tak terbatas.</span><span class="saved-note"><i></i> Progres tersimpan di perangkat ini</span></footer>
+    <footer class="site-footer" id="footer" data-testid="site-footer"><span id="foot-tagline">Petualangan kecil. Langit tak terbatas.</span><span class="saved-note"><i></i> Progres tersimpan di perangkat ini</span></footer>
   </div>
   <section id="play-screen" class="play-screen" data-testid="play-screen" hidden aria-label="Arena Lompat Langit">
-    <div class="game-topline" data-testid="game-topline"><a href="#beranda" data-testid="game-home-link">lompat langit<span>.</span></a><span>MODE TANPA AKHIR</span></div>
+    <div class="game-topline" data-testid="game-topline"><a href="#beranda" id="top-brand" data-testid="game-home-link">lompat langit<span>.</span></a><span id="top-mode">MODE TANPA AKHIR</span></div>
     <div class="arena" id="arena" data-testid="game-arena">
       <canvas id="game-canvas" data-testid="game-canvas" width="400" height="720" tabindex="0" aria-label="Arena permainan. Tap sisi kiri atau kanan untuk lompat manual. Mendarat dulu sebelum lompat lagi."></canvas>
       <div class="game-hud">
-        <div class="hud-score" data-testid="hud-height"><small>KETINGGIAN</small><strong id="hud-height" data-testid="height-value">0 <em>m</em></strong><span id="hud-best" data-testid="hud-best">Rekor 0 m</span></div>
-        <div class="hud-right"><div class="hud-stars" data-testid="run-stars"><img src="/assets/sky/star.png" alt="Bintang"><strong id="hud-stars" data-testid="run-stars-value">0</strong></div><button id="pause-button" data-testid="pause-button" class="icon-button" aria-label="Jeda permainan"></button></div>
+        <div class="hud-score" data-testid="hud-height"><small id="hud-label">KETINGGIAN</small><strong id="hud-height" data-testid="height-value">0 <em>m</em></strong><span id="hud-best" data-testid="hud-best">Rekor 0 m</span></div>
+        <div class="hud-right"><div class="hud-stars" data-testid="run-stars"><img id="hud-star-img" src="/assets/sky/star.png" alt="Bintang"><strong id="hud-stars" data-testid="run-stars-value">0</strong></div><button id="pause-button" data-testid="pause-button" class="icon-button" aria-label="Jeda permainan"></button></div>
       </div>
       <div class="power-status" id="power-status" data-testid="active-power-ups" aria-live="polite"></div>
       <div class="zone-status" data-testid="zone-status"><strong id="zone-name" data-testid="zone-name">Taman Awan</strong><span id="zone-difficulty" data-testid="zone-difficulty">Pemanasan</span></div>
@@ -39,7 +40,7 @@
       <div class="game-gesture" id="game-gesture" data-testid="game-gesture">BERPIJAK · Tap arah untuk melompat</div>
       <div id="game-overlay" class="game-overlay" data-testid="game-overlay" hidden></div>
     </div>
-    <div class="game-bottomline" data-testid="desktop-game-hint"><span>Tap ← → atau A / D untuk melompat</span><span>ESC untuk jeda</span></div>
+    <div class="game-bottomline" data-testid="desktop-game-hint"><span id="hint-keys">Tap ← → atau A / D untuk melompat</span><span id="hint-esc">ESC untuk jeda</span></div>
   </section>
   <div class="toast" id="toast" role="status" data-testid="toast" hidden></div>
   <noscript>Aktifkan JavaScript untuk memainkan Lompat Langit.</noscript>

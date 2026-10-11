@@ -1,0 +1,8 @@
+html[lang=ko]:root,html[lang=ko] body,html[lang=ko] button,html[lang=ko] input{font-family:'Nunito','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif}
+html[lang=ko] h1,html[lang=ko] h2,html[lang=ko] h3,html[lang=ko] .brand,html[lang=ko] .hud-score>strong,html[lang=ko] .record-tag strong,html[lang=ko] .result-score,html[lang=ko] .game-message,html[lang=ko] .game-topline>a{font-family:'Fredoka','Jua','Noto Sans KR',sans-serif}
+html[lang=ko] body{word-break:keep-all;line-break:strict}
+html[lang=ko] .hero h1{letter-spacing:-.5px;line-height:1.25}
+.power-status>span.cooling{opacity:.65;border-style:dashed;color:#6b6f5c}
+.power-status>span.cooling img{filter:grayscale(1)}
+.language-setting .setting-row{border-bottom:0;padding-bottom:18px}
+.language-setting{border-bottom:1px solid #d8dfca;margin-bottom:4px}

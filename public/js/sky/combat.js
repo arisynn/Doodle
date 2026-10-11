@@ -1,5 +1,6 @@
 import { W, H, JUMP, clamp } from './world.js';
 import { ENEMIES } from './catalog.js';
+import { L, loc } from './i18n.js';
 function enemyAttack(g, e, dt) {
   const p = g.player;
   if (e.dash > 0) {
@@ -35,21 +36,21 @@ export function updateCombat(g, dt, prevY) {
     e.flash = Math.max(0, (e.flash || 0) - dt);
     if (e.dead) continue;
     if (e.type === 'mimic') {
-      if (!e.revealed && Math.hypot(e.x - p.x, e.y - p.y) < 155) { e.revealed = true; e.revealGrace = .6; g.message = { text: 'Pijakan palsu! Injak dari atas.', until: g.time + 1.8 }; }
+      if (!e.revealed && Math.hypot(e.x - p.x, e.y - p.y) < 155) { e.revealed = true; e.revealGrace = .6; g.message = { text: L('Pijakan palsu! Injak dari atas.', '가짜 발판! 위에서 밟으세요.'), until: g.time + 1.8 }; }
       e.revealGrace = Math.max(0, e.revealGrace - enemyDt); e.warning = e.revealGrace;
     }
     if (['drone', 'jelly', 'wisp'].includes(e.type)) enemyAttack(g, e, enemyDt);
     if (Math.abs(p.x - e.x) < 30 && Math.abs(p.y - e.y) < 33) {
       if (p.vy > 0 && prevY + 20 <= e.y + 6) {
         g.defeat(e); p.vy = 45; p.stompReady = .35; p.doubleUsed = false; p.squash = .6;
-        g.message = { text: 'Kena! Tap cepat untuk lompat lagi.', until: g.time + 1 };
-      } else if (e.type !== 'mimic' || (e.revealed && e.revealGrace <= 0)) g.damage('Terkena ' + ENEMIES[e.type].name);
+        g.message = { text: L('Kena! Tap cepat untuk lompat lagi.', '명중! 빨리 탭해서 다시 점프하세요.'), until: g.time + 1 };
+      } else if (e.type !== 'mimic' || (e.revealed && e.revealGrace <= 0)) g.damage(L('Terkena ' + ENEMIES[e.type].name, loc(ENEMIES[e.type], 'name') + '에게 맞음'));
     }
   }
   for (const b of g.hostile) {
     if (g.state !== 'playing') break;
     b.x += b.vx * enemyDt; b.y += b.vy * enemyDt;
-    if (Math.hypot(b.x - p.x, b.y - p.y) < 22) { b.dead = true; g.damage('Terkena proyektil musuh'); }
+    if (Math.hypot(b.x - p.x, b.y - p.y) < 22) { b.dead = true; g.damage(L('Terkena proyektil musuh', '적의 발사체에 맞음')); }
   }
   g.hostile = g.hostile.filter(b => !b.dead && b.y > g.camera - 100 && b.y < g.camera + H + 100 && b.x > -30 && b.x < W + 30);
 }
