@@ -2,6 +2,9 @@ import { GRAVITY, JUMP, SPEED } from './constants.js';
 import { AIR_DRAG } from './physics.js';
 // Everything here is derived from the live physics constants, never hand-tuned.
 export const APEX = JUMP * JUMP / (2 * GRAVITY);
+// Highest platform surface a normal jump can still land on: apex plus the engine's 5 px landing tolerance (engine.land).
+export const LANDING_TOLERANCE = 5;
+export const MAX_RISE = APEX + LANDING_TOLERANCE;
 export const airTime = dy => { const disc = JUMP * JUMP - 2 * GRAVITY * dy; return disc < 0 ? 0 : (-JUMP + Math.sqrt(disc)) / GRAVITY; };
 // Max horizontal travel before landing on a platform dy px above takeoff, using `taps` evenly spaced pushes (the jump tap counts as one).
 export function reach(dy, taps = 1) {

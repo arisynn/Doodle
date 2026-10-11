@@ -12,7 +12,7 @@ export class World {
   constructor(seed, options = {}) {
     this.seed = seed; this.rng = random(seed); this.introduced = new Set(); this.history = options.history ? [] : null;
     this.platforms = [{ x: 142, y: 660, baseY: 660, w: 116, type: 'normal', id: 0, baseX: 142, zone: 0, safe: true }];
-    this.lastSpine = { x: 142, y: 660, w: 116, type: 'normal' };
+    this.lastSpine = { x: 142, y: 660, w: 116, type: 'normal' }; this.rowBefore = []; this.rowPrev = [this.lastSpine]; this.rowLevel = 0;
     this.items = []; this.enemies = []; this.level = 0; this.top = 660; this.motionTime = 0;
     this.nextPower = 80; this.lastPowers = []; this.lastDrop = {};
     this.director = new LevelDirector(this.rng, this.introduced); this.encounters = new EncounterDirector(this.rng, this.introduced);
@@ -22,16 +22,18 @@ export class World {
   generate(top, active = {}) { while (this.top > top - BALANCE.lookahead) this.addBeat(active); }
   addBeat(active) {
     const beat = this.director.nextBeat(this), made = [];
-    for (const row of beat.rows) for (const n of row.nodes) {
-      const p = { id: ++this.level, x: n.x, baseX: n.x, y: n.y, baseY: n.y, w: n.w, type: n.type, phase: n.phase ?? this.rng() * Math.PI * 2, zone: zoneAt(toMeters(n.y)), speed: 1 + beat.d * .8, active: true, direction: this.rng() < .5 ? -1 : 1, safe: n.type !== 'phase', spine: n.spine };
+    for (const row of beat.rows) { this.rowLevel++; for (const n of row.nodes) {
+      n.level = this.rowLevel;
+      const p = { level: this.rowLevel, id: ++this.level, x: n.x, baseX: n.x, y: n.y, baseY: n.y, w: n.w, type: n.type, phase: n.phase ?? this.rng() * Math.PI * 2, zone: zoneAt(toMeters(n.y)), speed: 1 + beat.d * .8, active: true, direction: this.rng() < .5 ? -1 : 1, safe: n.type !== 'phase', spine: n.spine };
       n.platform = p; made.push(p); this.platforms.push(p);
-    }
+    } }
+    this.rowBefore = beat.rows.length > 1 ? beat.rows.at(-2).nodes : this.rowPrev; this.rowPrev = beat.rows.at(-1).nodes;
     const lastNode = beat.rows.at(-1).nodes.find(n => n.spine), lastY = beat.rows.at(-1).nodes[0].y;
-    this.top = lastY; this.lastSpine = { x: lastNode.x, y: lastNode.y, w: lastNode.w, type: lastNode.type };
+    this.top = lastY; this.lastSpine = { x: lastNode.x, y: lastNode.y, w: lastNode.w, type: lastNode.type, platform: lastNode.platform };
     // Phase tiles always get a fixed side alternative; if none fits they become solid.
     for (const p of made.filter(q => q.type === 'phase')) {
       const alternative = sideTile(this.platforms, p, 64, `safe-${p.id}`);
-      if (alternative) this.platforms.push(alternative); else { p.type = 'normal'; p.safe = true; }
+      if (alternative) { alternative.level = p.level; this.platforms.push(alternative); } else { p.type = 'normal'; p.safe = true; }
     }
     const powerRows = new Set();
     beat.rows.forEach((row, i) => {

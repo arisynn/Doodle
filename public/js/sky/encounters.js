@@ -37,7 +37,8 @@ export class EncounterDirector {
   placeGround(type, rowIdx, beat, world, corridors) {
     const main = beat.rows[rowIdx].nodes.find(n => n.spine).platform;
     for (const side of ['left', 'right']) {
-      const tile = sideTile(world.platforms, main, 64, `enemy-${main.id}`, -20, [side]);
+      const tile = sideTile(world.platforms, main, 64, `enemy-${main.id}`, 0, [side]);
+      if (tile) tile.level = main.level;
       if (!tile) continue;
       const x = tile.x + tile.w / 2, y = tile.y - 19, box = enemyBox(type, x, y);
       if (corridors.some(c => hit(box, c))) continue;

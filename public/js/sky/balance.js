@@ -6,7 +6,9 @@ export const BALANCE = {
   maxAttempts: 6,
   difficulty: { scale: 1500, warmupMeters: 60, warmupFloor: .35 },
   taps: [[0, 1], [.4, 2], [.8, 3]],
-  gap: { easy: 76, hard: 108, jitter: 12, max: 128, rest: 72, elevatorMax: 112 },
+  gap: { easy: 100, hard: 114, jitter: 10, max: 128, rest: 100, elevatorMax: 112 },
+  // Two consecutive gaps must exceed the real jump apex (+landing tolerance) by this much, so one jump never skips a level.
+  twoLevelMargin: 12,
   width: { easy: 112, hard: 66, jitter: 7, precision: 58, recovery: 118, branch: 76 },
   pacing: { cycle: ['flow', 'flow', 'escalation', 'climax', 'recovery'], mult: { intro: .3, flow: .75, escalation: 1, climax: 1.25, recovery: .25 } },
   grammar: {

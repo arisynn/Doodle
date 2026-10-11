@@ -1,5 +1,5 @@
 import { W } from './constants.js';
-import { APEX, reach } from './jumpmodel.js';
+import { APEX, MAX_RISE, reach } from './jumpmodel.js';
 import { BALANCE as B } from './balance.js';
 import { tileBounds, overlaps } from './placement.js';
 const PERIOD = W + 35;
@@ -16,8 +16,11 @@ export function edgeOk(a, b, taps) {
   if (dy > APEX - B.edgeMargin) return false;
   return hGap(a, b) <= reach(Math.max(0, dy), taps);
 }
+const ELEV = 15;
+// A normal jump must never land two levels up (springs are the intended exception). Elevators are taken at their most favourable pose.
+export const twoLevelOk = (a, c) => a.type === 'spring' || (a.y - c.y) - (a.type === 'elevator' ? ELEV : 0) - (c.type === 'elevator' ? ELEV : 0) >= MAX_RISE + B.twoLevelMargin;
 // Returns a list of problems; empty means every node is reachable and nothing collides.
-export function validateRows(prev, rows, existing, taps) {
+export function validateRows(prev, rows, existing, taps, ctx = {}) {
   const issues = [], placed = [];
   let last = prev;
   rows.forEach((row, i) => {
@@ -32,5 +35,8 @@ export function validateRows(prev, rows, existing, taps) {
     if (!spine) issues.push(`row ${i}: no spine`);
     last = spine ?? last;
   });
+  const levels = [ctx.before ?? [], ctx.prevRow ?? [prev], ...rows.map(r => r.nodes)];
+  for (let i = 0; i + 2 < levels.length; i++) for (const a of levels[i]) for (const c of levels[i + 2]) if (!twoLevelOk(a, c)) issues.push(`level ${i}: ${a.type} reaches two levels up`);
+  for (let i = 0; i < rows.length - 1; i++) for (const n of rows[i].nodes) if (!rows[i + 1].nodes.some(m => edgeOk(n, m, taps))) issues.push(`row ${i}: dead end`);
   return issues;
 }

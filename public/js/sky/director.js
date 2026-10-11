@@ -32,7 +32,7 @@ export class LevelDirector {
   typePicker(c, pattern) {
     const featured = c.featured?.kind === 'type' ? c.featured.id : null, allowed = TYPE_RULES[pattern];
     return (i, prevType, dy, w) => {
-      if (featured) return i % 2 ? featured : 'normal';
+      if (featured) return i % 3 === 1 ? featured : 'normal';
       if (c.role === 'intro') return 'normal';
       if (pattern === 'moving') return 'moving';
       const options = [{ id: 'normal', weight: Math.max(18, 65 - c.d * 42) }];
@@ -69,7 +69,7 @@ export class LevelDirector {
     for (; attempts < B.maxAttempts && issues.length; attempts++) {
       pattern = attempts < B.maxAttempts - 2 ? this.choosePattern(role, d, m, featured) : 'recovery';
       rows = this.build(pattern, c); this.layout(rows, world.top);
-      issues = validateRows(prev, rows, world.platforms, taps);
+      issues = validateRows(prev, rows, world.platforms, taps, { before: world.rowBefore, prevRow: world.rowPrev });
     }
     if (issues.length) { rows = this.fallback(c); this.layout(rows, world.top); pattern = 'fallback'; this.stats.fallbacks++; }
     this.stats.beats++; this.stats.retries += attempts - 1; this.lastPattern = pattern;

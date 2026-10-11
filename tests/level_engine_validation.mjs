@@ -3,7 +3,8 @@ globalThis.document = { documentElement: {} }; globalThis.window = { localStorag
 const { World, toMeters, GRAVITY, JUMP, H } = await import('../public/js/sky/world.js');
 const { ENEMIES, POWERS } = await import('../public/js/sky/catalog.js');
 const { horizontalStep } = await import('../public/js/sky/physics.js');
-const { edgeOk } = await import('../public/js/sky/solver.js');
+const { edgeOk, twoLevelOk } = await import('../public/js/sky/solver.js');
+const { MAX_RISE, APEX } = await import('../public/js/sky/jumpmodel.js');
 const { tileBounds, overlaps } = await import('../public/js/sky/placement.js');
 const { corridor, enemyBox, ARCH } = await import('../public/js/sky/encounters.js');
 const { BALANCE } = await import('../public/js/sky/balance.js');
@@ -35,6 +36,33 @@ function canLand(a, b, maxTaps) {
   }
   return false;
 }
+const clampX = (n, a, b) => Math.max(a, Math.min(b, n));
+const posX = (p, t) => (p.type === 'moving' ? clampX(p.baseX + Math.sin(t * (p.speed || 1) * 1.35 + (p.phase || 0)) * 27, 5, 400 - p.w - 5) : p.baseX);
+// Moving tiles: the jump starts at any time t0, the target tile is wherever it really is during the flight.
+function canLandTimed(a, b, maxTaps) {
+  const dt = 1 / 240, dy = a.baseY - b.baseY, air = (-JUMP + Math.sqrt(JUMP * JUMP - 2 * GRAVITY * Math.max(0, dy))) / GRAVITY;
+  for (let k = 0; k < 24; k++) for (let taps = 1; taps <= maxTaps; taps++) for (let mask = 0; mask < (1 << taps); mask++) for (const off of [0, -.3, .3]) {
+    const t0 = k * 0.29;
+    let x = posX(a, t0) + a.w / 2 + off * a.w / 2, y = a.baseY - 20, vy = JUMP, vx = 0, prev = y, t = 0, next = 0;
+    for (let step = 0; step < 4000; step++) {
+      if (next < taps && t >= next * air / taps) { vx = (mask >> next & 1 ? -1 : 1) * 340; next++; }
+      const h = horizontalStep(vx, dt); vx = h.velocity; x += h.distance;
+      if (x < -18) x = 417; if (x > 418) x = -17;
+      vy += GRAVITY * dt; prev = y; y += vy * dt; t += dt;
+      const bx = posX(b, t0 + t);
+      if (vy > 0 && prev + 20 <= b.baseY + 5 && y + 20 >= b.baseY && x + 14 > bx && x - 14 < bx + b.w) return true;
+      if (y > a.baseY + 400) break;
+    }
+  }
+  return false;
+}
+// Vertical-only flight with the engine's integrator: can a normal jump from tile a ever land on tile c (any x)?
+function verticallyReachable(a, c) {
+  const dt = 1 / 120, ay = a.baseY - (a.type === 'elevator' ? 15 : 0), cy = c.baseY + (c.type === 'elevator' ? 15 : 0);
+  let y = ay - 20, vy = JUMP;
+  for (let step = 0; step < 600; step++) { const prev = y; vy += GRAVITY * dt; y += vy * dt; if (vy > 0 && prev + 20 <= cy + 5 && y + 20 >= cy) return true; if (y > ay + 50) return false; }
+  return false;
+}
 const spineOf = beat => [beat.prev, ...beat.rows.map(r => r.nodes.find(n => n.spine))];
 
 for (let seed = 1; seed <= SEEDS; seed++) {
@@ -52,6 +80,7 @@ for (let seed = 1; seed <= SEEDS; seed++) {
       if (!canLand(chain[i], n, beat.taps)) note('design-sim', `seed ${seed} beat ${beat.idx} row ${i} needs more than the designed ${beat.taps} taps`);
       if (i % 2 === 0 || n.type !== 'normal') { if (!canLand(chain[i], n, CAP)) { stats.simFail++; note('physics-sim', `seed ${seed} beat ${beat.idx} row ${i} ${chain[i].type}->${n.type} dy=${(chain[i].y - n.y).toFixed(0)}`); } }
       if (n.type !== 'normal' && !(n.type in typeFirst)) typeFirst[n.type] = beat;
+      if ((n.type === 'moving' || chain[i].type === 'moving') && n.platform && (chain[i].platform || i === 0)) { stats.timed = (stats.timed || 0) + 1; const pa = chain[i].platform ?? { ...chain[i], baseX: chain[i].x, baseY: chain[i].y }; if (!canLandTimed(pa, n.platform, beat.taps)) note('moving-timed', `seed ${seed} beat ${beat.idx} row ${i} ${pa.type}(${pa.baseX.toFixed(0)},w${pa.w.toFixed(0)})->${n.platform.type}(${n.platform.baseX.toFixed(0)},w${n.platform.w.toFixed(0)}) dy=${(pa.baseY - n.platform.baseY).toFixed(0)} taps=${beat.taps}`); }
       stats.byType[n.type] = (stats.byType[n.type] || 0) + 1;
     });
     const dys = beat.rows.map(r => r.dy);
@@ -77,6 +106,20 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   const tiles = [...w.platforms].sort((p, q) => p.baseY - q.baseY);
   for (let i = 0; i < tiles.length; i++) for (let j = i + 1; j < tiles.length && tiles[j].baseY - tiles[i].baseY < 90; j++)
     if (overlaps(tileBounds(tiles[i]), tileBounds(tiles[j]), 0)) note('tile-overlap', `seed ${seed} ids ${tiles[i].id}/${tiles[j].id} ${tiles[i].type}/${tiles[j].type}`);
+  // One jump, one level: no normal jump may land two or more levels up (springs excepted); every tile has a way onward.
+  const byLevel = new Map(); for (const p of w.platforms) { if (!byLevel.has(p.level)) byLevel.set(p.level, []); byLevel.get(p.level).push(p); }
+  const maxLevel = Math.max(...byLevel.keys());
+  for (const [lvl, group] of byLevel) {
+    for (const a of group) {
+      stats.levelChecks = (stats.levelChecks || 0) + 1;
+      if (a.type !== 'spring') for (const k of [lvl + 2, lvl + 3]) for (const c of byLevel.get(k) ?? []) {
+        const ra = { x: a.baseX, y: a.baseY, w: a.w, type: a.type }, rc = { x: c.baseX, y: c.baseY, w: c.w, type: c.type };
+        if (!twoLevelOk(ra, rc) || verticallyReachable(a, c)) note('level-skip', `seed ${seed} level ${lvl}->${k} ${a.type}->${c.type} dy=${(a.baseY - c.baseY).toFixed(0)}`);
+      }
+      if (lvl < maxLevel - 1 && !(byLevel.get(lvl + 1) ?? []).concat(group).some(c => c !== a && edgeOk({ x: a.baseX, y: a.baseY, w: a.w, type: a.type }, { x: c.baseX, y: c.baseY, w: c.w, type: c.type }, 3))) note('dead-end', `seed ${seed} level ${lvl} ${a.type}`);
+    }
+    for (const a of group) for (const c of byLevel.get(lvl + 1) ?? []) { /* adjacent level exists */ }
+  }
   // Enemy fairness: clear of tiles, clear of spine corridors (except lane-B risk enemies), bounded density, shooter spacing.
   const alive = w.enemies.filter(e => !e.dead);
   stats.enemies += alive.length;
@@ -92,6 +135,7 @@ for (let seed = 1; seed <= SEEDS; seed++) {
   // Determinism.
   if (seed <= 5) { const w2 = new World(seed * 7919); for (let cam = 0; cam > -METERS * 40; cam -= 300) w2.generate(cam, {}); const sig = x => x.platforms.map(p => `${p.type}:${p.baseX.toFixed(2)}:${p.baseY.toFixed(2)}`).join('|'); if (sig(w) !== sig(w2)) note('determinism', `seed ${seed}`); }
 }
+stats.maxRiseBudget = { apex: +APEX.toFixed(1), landable: +MAX_RISE.toFixed(1) };
 console.log(JSON.stringify(stats));
 const keys = Object.keys(fail);
 for (const k of keys) console.log(`FAIL ${k}: ${fail[k].length} e.g. ${fail[k].slice(0, 3).join(' ; ')}`);
