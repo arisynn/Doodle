@@ -42,6 +42,7 @@ export class Store {
           this.data.ledger = (Array.isArray(raw.ledger) ? raw.ledger : []).filter(t => Number.isSafeInteger(t.amount) && t.amount !== 0 && typeof t.source === 'string' && typeof t.at === 'number').slice(-30);
         }
       }
+      if (raw?.version < 3) this.save();
     } catch { this.saveError = true; }
   }
   save() {

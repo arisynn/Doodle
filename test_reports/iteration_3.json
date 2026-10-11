@@ -1,0 +1,22 @@
+{
+  "summary": "Frontend-only round for Lompat Langit (static Express). Verified: (1) Korean/Indonesian language switch in Settings with full UI translation across header, home, shop (all 6 tabs), missions, guide (all 4 tabs), settings, game HUD, zone names, document.title, html lang; (2) persistence via localStorage key lompat-langit-lang after reload; (3) no console/page errors on any route in either language; (4) guide Zonas tab shows 5 zones with correct ranges 0-250, 250-700, 700-1.300, 1.300-2.200, 2.200+ m; (5) guide shows 'Meter yang nyata' and 'Cooldown' cards; (6) power-up guide shows 'Jeda drop' and 'Cooldown pakai' notes; (7) shop unlock thresholds match (Luna 700m, Nimbus 2200m, trail/supply new values); (8) real-meter scale (first game: height went 0 -> 4 m after 6 taps on starting platforms; zone name = 'Taman Awan'); (9) tutorial dismisses via data-testid=tutorial-ready; (10) cooldown logic verified in-engine via collect(): shield (12s), jetpack (30s), magnet (no cooldown); same-type pickup within cooldown is blocked and item stays untaken; (11) v2 save with best=2000 migrates to best=100 m (verified via page.add_init_script); (12) drop_cooldown_check.mjs exits 0.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/tests/drop_cooldown_check.mjs"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "input.js pagehide handler unconditionally calls store.save() on page unload. This overwrites any externally-mutated localStorage before the next page load (observed when a test re-writes lompat-langit-v1 then reloads; the current in-memory fresh() state is persisted instead). Not a user-facing bug but worth noting; harmless in normal gameplay but can mask migration test attempts that use page.reload instead of a cold navigation. If future test infra needs to seed saves, use page.add_init_script (as done here) or close/reopen context instead of reload.",
+    "Store constructor relies on save() being called elsewhere (settings click, finish, earn...) and never saves right after a migration. That means a v2 user who merely opens the app and quits without interaction keeps the v2 payload on disk; the migrated best is only persisted on the next action. Low risk because migration is idempotent."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "seed_data_creation": "Used page.add_init_script to inject lompat-langit-v1 v2 save for migration test; test context does not pollute real users.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "App is a static Doodle-Jump-like game served by Express at :3000. No backend/auth. All game logic in /app/public/js/sky/*.js. i18n uses L(id, ko) and loc(obj,'field'). Key test commands: `node --experimental-default-type=module /app/tests/drop_cooldown_check.mjs` (exit 0). For save migration tests, DO NOT use page.reload after mutating localStorage — the pagehide save handler will overwrite it. Use page.add_init_script before goto, or open a fresh browser context. 1 m = 40 px (PX_PER_M). Zones: Taman Awan 0 / Lembah Angin 250 / Kepulauan Senja 700 / Rasi Bintang 1300 / Puncak Aurora 2200. Cooldowns: shield 12, jetpack 30, doublejump 20, slow 25, balloon 60, magnet none.",
+  "rca of the issue": "No bugs found. All requested features behave as specified."
+}

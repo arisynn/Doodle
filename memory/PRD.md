@@ -50,3 +50,12 @@ Approved initial plan: finish the existing Doodle Jump browser project as Lompat
 - P0: Verify economy migration, transaction invariants, all categories/equip, one-slot first-tap consumption, inventory5 cap, persistence, celebration, bounded mission rewards. Update old tests to superseding requirements.
 - P1: Long-play tuning based on actual player skill and measured income/spending. Optional spending means a perfectly equal lifetime income/spending ratio is not guaranteed or enforced; never confiscate Bintang.
 - P2: Optional shareable result card / same-seed personal challenges (not implemented).
+
+
+## Update (Jul 2026): Korean, real meters, new zones, cooldowns
+- Request: "tambahkan bahasa korea, update level-level, meter real, cooldown powerups & drop". User chose full Korean UI/guide/missions/shop, language switch in Settings, and allowed adjusting the 10k m target to what fits the accurate physics.
+- i18n: public/js/sky/i18n.js (`L(id, ko)`, `loc(obj, field)`, `setLang`), key `lompat-langit-lang` (defaults to browser language). Settings page has Bahasa Indonesia / 한국어 selector. Fonts: Jua + Noto Sans KR via public/css/lang.css.
+- Real meters: 1 m = 40 px (collision body = 1 m tall). height = (636 - y)/40. Jump apex ~4.2 m, tile gaps 1.9-3.3 m. 10,000 m would be >1 hour of near-perfect play, so zones were fitted: 0 / 250 / 700 / 1300 / 2200 m (final zone = endless). Save schema v3 migrates old best (px/2 units) by /20.
+- All unlock thresholds (power-ups, enemies, tile types, skins, cosmetics, supplies) rescaled to the meter values in catalog.js/economy.js/world.js. Difficulty intensity = min(1, m/3500).
+- Cooldowns: (1) drop spawn: global gap 18-30 m (+ up to 12 m) and per-type `dropCooldown` m (shield 60, magnet 70, jetpack 150, doublejump 90, slow 110, balloon 200). (2) use cooldown (seconds from pickup, incl. supplies): shield 12, jetpack 30, doublejump 20, slow 25, balloon 60, magnet none. Cooling items can't be picked up (message + item stays); HUD shows greyed "CD/쿨다운 N" pill.
+- Checks: tests/drop_cooldown_check.mjs (node --experimental-default-type=module) -> 0 violations. Old tests in tests/ still target pre-manual-control rules and are outdated.
