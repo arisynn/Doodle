@@ -11,7 +11,7 @@ export class Game {
   }
   start(seed = Math.floor(Math.random() * 2147483647)) {
     this.world = new World(seed);
-    this.player = { x: 200, y: 640, vx: 0, vy: 0, facing: 1, move: 0, squash: 0, grounded: true, platform: this.world.platforms[0], offset: 58, doubleUsed: false, stompReady: 0 };
+    this.player = { x: 200, y: 640, vx: 0, vy: 0, facing: 1, move: 0, squash: 0, grounded: true, platform: this.world.platforms[0], offset: 58, doubleUsed: false, stompReady: 0, coyote: 0 }; this.buffer = 0;
     this.camera = 0; this.time = 0; this.height = 0; this.stars = 0; this.kills = 0;
     this.beforeBest = this.store.data.best; this.shield = false; this.jet = 0; this.magnet = 0; this.invincible = 0;
     this.doublejump = 0; this.slow = 0; this.balloon = false; this.runStarted = false; this.supplyUsed = null; this.partyUsed = null; this.cool = {};
@@ -33,14 +33,15 @@ export class Game {
     // Each tap sets one bounded push. Repeated taps never stack speed.
     p.vx = p.move * SPEED;
     if (this.jet > 0) return false;
-    if (p.grounded || p.stompReady > 0) { this.launch(p.platform?.type === 'spring' ? JUMP * 1.55 : JUMP); return true; }
+    if (p.grounded || p.stompReady > 0 || p.coyote > 0) { this.launch(p.platform?.type === 'spring' ? JUMP * 1.55 : JUMP); return true; }
     if (this.doublejump > 0 && !p.doubleUsed) { p.doubleUsed = true; this.launch(JUMP * .96); this.feedback.play('power'); return true; }
+    this.buffer = .09;
     return false;
   }
   launch(force) {
     const p = this.player, pl = p.platform;
     if (pl?.type === 'fragile') { pl.broken = true; this.burst(pl.x + pl.w / 2, pl.y, '#b78c65', 12, 'chip'); }
-    p.grounded = false; p.platform = null; p.stompReady = 0; p.vy = force; p.vx = p.move * SPEED; p.squash = .5;
+    p.grounded = false; p.platform = null; p.stompReady = 0; p.coyote = 0; this.buffer = 0; p.vy = force; p.vx = p.move * SPEED; p.squash = .5;
     this.feedback.play(force < JUMP ? 'power' : 'jump');
   }
   pause() { if (this.state !== 'playing') return; this.state = 'paused'; this.clearInput(); this.callbacks.pause?.(); }
@@ -99,7 +100,7 @@ export class Game {
     this.time += dt; const p = this.player;
     for (const k of ['jet', 'magnet', 'doublejump', 'slow', 'invincible', 'shake']) this[k] = Math.max(0, this[k] - dt);
     for (const k in this.cool) this.cool[k] = Math.max(0, this.cool[k] - dt);
-    p.stompReady = Math.max(0, p.stompReady - dt); p.squash = Math.max(0, p.squash - dt * 5);
+    p.stompReady = Math.max(0, p.stompReady - dt); p.coyote = Math.max(0, p.coyote - dt); this.buffer = Math.max(0, this.buffer - dt); p.squash = Math.max(0, p.squash - dt * 5);
     this.world.update(this.time, dt, this.camera, this);
     if (p.grounded) this.ridePlatform(dt);
     const prevY = p.y;
@@ -133,11 +134,11 @@ export class Game {
   }
   ridePlatform(dt) {
     const p = this.player, pl = p.platform;
-    if (!pl || pl.broken || pl.active === false || !this.world.platforms.includes(pl)) { p.grounded = false; p.platform = null; p.vy = 30; return; }
+    if (!pl || pl.broken || pl.active === false || !this.world.platforms.includes(pl)) { p.grounded = false; p.platform = null; p.vy = 30; p.coyote = .1; return; }
     if (pl.type === 'ice') { p.offset += p.vx * dt; p.vx *= Math.exp(-dt * 2); }
     if (pl.type === 'conveyor') p.offset += pl.direction * 100 * dt;
     p.x = pl.x + p.offset; p.y = pl.y - 20; p.vy = 0;
-    if (p.offset < -10 || p.offset > pl.w + 10) { p.grounded = false; p.platform = null; p.vy = 30; }
+    if (p.offset < -10 || p.offset > pl.w + 10) { p.grounded = false; p.platform = null; p.vy = 30; p.coyote = .1; }
   }
   land(prevY) {
     const p = this.player;
@@ -147,7 +148,11 @@ export class Game {
       if (pl.type === 'cloud' && pl.dissolve === undefined) pl.dissolve = .65;
       const effect = this.store.data.equipped?.landing;
       const sprite = { 'landing-petal': 'particle-petal', 'landing-ripple': 'particle-ripple', 'landing-comet': 'particle-comet' }[effect];
-      this.burst(p.x, pl.y, '#fff8df', sprite ? 10 : 4, 'dot', sprite); break;
+      const feel = { spring: ['#f1c24f', 12], cloud: ['#ffffff', 8], ice: ['#bfe9f7', 8], fragile: ['#b78c65', 6], conveyor: ['#d4c39a', 6] }[pl.type];
+      this.burst(p.x, pl.y, feel ? feel[0] : '#fff8df', sprite ? 10 : feel ? feel[1] : 4, 'dot', sprite);
+      if (pl.type === 'spring') { this.shake = Math.max(this.shake, .06); this.feedback.play('power'); }
+      if (this.buffer > 0) this.command(p.move);
+      break;
     }
   }
   cosmeticTrail(dt) {

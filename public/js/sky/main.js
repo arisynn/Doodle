@@ -18,6 +18,7 @@ export const game = new Game(store, audio, {
   over: result => showOverlay(resultView(result, store)),
   update: updateHud
 });
+game.debug = new URLSearchParams(location.search).has('debug');
 function stamp(root, prefix) {
   root.querySelectorAll('button,a,h1,h2,h3,p,small,span,strong,progress,input,img[alt]:not([alt=""])').forEach((el, i) => {
     if (!el.dataset.testid) el.dataset.testid = `${prefix}-${el.id || el.tagName.toLowerCase() + '-' + i}`;

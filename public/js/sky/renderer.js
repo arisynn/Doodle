@@ -56,6 +56,34 @@ export class Renderer {
     c.restore();
     if (g.balloon) this.image('balloon', p.x + 15, p.y - cam - 65, 24, 36);
     for (const pt of g.particles) { c.globalAlpha = Math.min(1, pt.life * 2); c.fillStyle = pt.color; if (pt.sprite) this.image(pt.sprite, pt.x - 6, pt.y - cam - 6, 12, 12); else if (pt.kind === 'chip') c.fillRect(pt.x, pt.y - cam, 7, 4); else { c.beginPath(); c.arc(pt.x, pt.y - cam, 2.8, 0, Math.PI * 2); c.fill(); } }
+    this.threatIndicators(g);
+    if (g.debug) this.debugOverlay(g);
+    c.restore();
+  }
+  // Off-screen danger markers: a pulsing chevron under the HUD when a dangerous enemy is about to scroll in.
+  threatIndicators(g) {
+    const c = this.ctx, cam = g.camera;
+    for (const e of g.world.enemies) {
+      if (e.dead || e.type === 'mimic' && !e.revealed) continue;
+      const above = cam - e.y;
+      if (above < 0 || above > 330) continue;
+      const alpha = Math.min(.85, (330 - above) / 200) * (.6 + .4 * Math.sin(g.time * 8));
+      c.save(); c.globalAlpha = alpha; c.fillStyle = ['drone', 'jelly', 'wisp'].includes(e.type) ? '#c4553d' : '#d49a3c';
+      const x = Math.max(14, Math.min(W - 14, e.x));
+      c.beginPath(); c.moveTo(x, 100); c.lineTo(x - 8, 114); c.lineTo(x + 8, 114); c.closePath(); c.fill(); c.restore();
+    }
+  }
+  // Development only (?debug=1): seed, pacing, guaranteed route, and the director's decisions.
+  debugOverlay(g) {
+    const c = this.ctx, cam = g.camera, w = g.world, beat = w.beatLog.at(-1), now = w.beatLog.find(b => b.y > cam) ?? beat;
+    c.save(); c.strokeStyle = '#d63fb3'; c.lineWidth = 2; c.setLineDash([6, 4]); c.beginPath();
+    w.spineLog.forEach((n, i) => { const y = n.y - cam; if (i) c.lineTo(n.x, y); else c.moveTo(n.x, y); }); c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#d63fb3'; for (const n of w.spineLog) c.fillRect(n.x - 3, n.y - cam - 3, 6, 6);
+    for (const e of w.enemies) { c.strokeStyle = '#2a7fd6'; c.strokeRect(e.baseX - 30, e.baseY - cam - 33, 60, 66); }
+    c.fillStyle = '#000000b0'; c.fillRect(4, 118, 232, 110); c.fillStyle = '#9ff29f'; c.font = '10px monospace'; c.textAlign = 'left';
+    const stats = w.director.stats, lines = [`seed ${w.seed}  m ${g.height}  beats ${stats.beats}`, `retry ${stats.retries} fallback ${stats.fallbacks}`,
+      `beat ${now?.idx} ${now?.role}/${now?.pattern} d=${now?.d} taps=${now?.taps}`, `hazard ${now?.spent}/${now?.budget} load ${now?.load}`, ...(now?.decisions ?? []).slice(-4)];
+    lines.forEach((t, i) => c.fillText(t.slice(0, 40), 8, 132 + i * 13));
     c.restore();
   }
 }

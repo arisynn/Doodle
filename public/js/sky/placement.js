@@ -7,11 +7,12 @@ export function tileBounds(tile) {
 export function overlaps(a, b, gap = 10) {
   return a.left < b.right + gap && a.right + gap > b.left && a.top < b.bottom + gap && a.bottom + gap > b.top;
 }
-export function sideTile(platforms, main, width, id, offsetY = 0) {
+export function sideTile(platforms, main, width, id, offsetY = 0, sides = null) {
   const bounds = tileBounds(main), y = main.baseY + offsetY;
   const choices = [bounds.right + 18, bounds.left - width - 18];
   if (main.baseX + main.w / 2 > 200) choices.reverse();
   for (const x of choices) {
+    if (sides && !sides.includes(x > main.baseX ? 'right' : 'left')) continue;
     if (x < 12 || x + width > 388) continue;
     const tile = { id, x, baseX: x, y, baseY: y, w: width, type: 'normal', zone: main.zone, safe: true };
     if (platforms.every(other => !overlaps(tileBounds(tile), tileBounds(other)))) return tile;
